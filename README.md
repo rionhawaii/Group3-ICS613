@@ -108,7 +108,6 @@ The application handles authentication (JWT), background scheduling (APScheduler
 | | JWT (JSON Web Tokens for user authentication) |
 | | APScheduler | ≥3.10, <4.0 (background tasks) |
 | | python-multipart | Photo uploads |
-| 
 | | email-validator | Email format validation |
 | **Database** | PostgreSQL 15 |
 |  | Docker Container (for PostgreSQL) |
