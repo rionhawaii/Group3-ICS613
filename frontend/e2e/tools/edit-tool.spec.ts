@@ -120,9 +120,10 @@ test.describe('EditToolPage', () => {
     const tool = await createTestTool(page, `E2E Bad Photo Type ${Date.now()}`);
 
     await page.goto(`/tools/${tool.id}/edit`);
-    // Wait for the owner's async PICKED_UP-status check to resolve --
-    // otherwise editBlocked is still true from isCheckingLoanStatus and
-    // this trips the loan-status guard instead of the photo validation.
+    // Wait for the owner's async PICKED_UP-status check to fully resolve --
+    // the Add Photos input is enabled before the check starts, so waiting
+    // for it to be enabled alone still races the loan-status guard.
+    await page.waitForLoadState('networkidle');
     await expect(page.getByLabel('Add Photos')).toBeEnabled();
     await page.getByLabel('Add Photos').setInputFiles({
       name: 'notes.txt',
