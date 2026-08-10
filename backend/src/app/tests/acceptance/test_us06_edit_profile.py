@@ -1,9 +1,11 @@
 """User Story 6 — Edit Profile."""
 
+from io import BytesIO
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.tests.acceptance.helpers import auth_header
+from app.tests.acceptance.helpers import auth_header, fake_photo
 from app.tests.factories import UserFactory
 
 pytestmark = pytest.mark.acceptance
@@ -58,12 +60,42 @@ class TestScenario3DisplayNameExceedsMaxLength:
 
 
 class TestScenario4ProfilePhotoUploadFailsValidation:
-    @pytest.mark.skip(
-        reason="not implemented: no profile-photo upload endpoint exists yet "
-        "(see US5 Scenario 4 for the same gap)."
-    )
-    async def test_invalid_photo_rejected_existing_photo_unchanged(self) -> None:
-        raise NotImplementedError
+    async def test_invalid_photo_rejected_existing_photo_unchanged(
+        self, client, db_session: AsyncSession
+    ) -> None:
+        """An invalid upload is rejected and the existing photo stays intact."""
+        user = await UserFactory.create_async(
+            db_session, photo_url="https://example.com/avatar.jpg"
+        )
+
+        response = await client.post(
+            "/api/v1/auth/me/photo",
+            files=[("photo", ("fake.png", BytesIO(b"not an image"), "image/png"))],
+            headers=auth_header(user.id),
+        )
+
+        assert response.status_code == 422
+        await db_session.refresh(user)
+        assert user.photo_url == "https://example.com/avatar.jpg"
+
+    async def test_valid_upload_replaces_existing_photo(
+        self, client, db_session: AsyncSession
+    ) -> None:
+        """A valid upload replaces the previous uploaded photo file."""
+        user = await UserFactory.create_async(db_session, photo_url="/uploads/old.jpg")
+
+        response = await client.post(
+            "/api/v1/auth/me/photo",
+            files=[("photo", fake_photo("new.jpg"))],
+            headers=auth_header(user.id),
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["photo_url"].startswith("/uploads/")
+        assert data["photo_url"] != "/uploads/old.jpg"
+        await db_session.refresh(user)
+        assert user.photo_url == data["photo_url"]
 
 
 class TestScenario5UnauthenticatedCannotEdit:

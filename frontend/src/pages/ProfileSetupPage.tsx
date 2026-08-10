@@ -19,7 +19,7 @@ import {
 
 const maxDisplayNameLength = 40;
 const maxNeighborhoodLength = 255;
-const maxPhotoSizeBytes = 2 * 1024 * 1024;
+const maxPhotoSizeBytes = 5 * 1024 * 1024;
 
 const allowedPhotoTypes = [
   'image/jpeg',
@@ -72,12 +72,12 @@ function readCachedProfile(): CachedProfile | null {
  * - Validates an optional profile-photo selection.
  * - Verifies authenticated API sessions through GET /auth/me.
  * - Saves supported profile fields through PUT /auth/me.
+ * - Uploads a selected profile photo through POST /auth/me/photo.
  * - Redirects unauthenticated users to Login.
  * - Redirects a user who already completed setup to Edit Profile.
  * - Redirects to Dashboard only after a successful save.
  *
  * Backend limitations:
- * - The current API does not provide profile-photo file upload.
  * - UserProfile does not expose an explicit profile-completed field.
  */
 function ProfileSetupPage() {
@@ -96,6 +96,8 @@ function ProfileSetupPage() {
   const [bio, setBio] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [photoFileName, setPhotoFileName] = useState('');
+  const [selectedPhotoFile, setSelectedPhotoFile] =
+    useState<File | null>(null);
 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -267,11 +269,13 @@ function ProfileSetupPage() {
 
     if (!selectedFile) {
       setPhotoFileName('');
+      setSelectedPhotoFile(null);
       return;
     }
 
     if (!allowedPhotoTypes.includes(selectedFile.type)) {
       setPhotoFileName('');
+      setSelectedPhotoFile(null);
       event.target.value = '';
 
       setErrorMessage(
@@ -283,16 +287,18 @@ function ProfileSetupPage() {
 
     if (selectedFile.size > maxPhotoSizeBytes) {
       setPhotoFileName('');
+      setSelectedPhotoFile(null);
       event.target.value = '';
 
       setErrorMessage(
-        'Profile photo must be 2 MB or smaller.',
+        'Profile photo must be 5 MB or smaller.',
       );
 
       return;
     }
 
     setPhotoFileName(selectedFile.name);
+    setSelectedPhotoFile(selectedFile);
   }
 
   /**
@@ -356,9 +362,10 @@ function ProfileSetupPage() {
 
     try {
       let savedUserId: string | undefined;
+      let savedPhotoUrl: string | null = null;
 
       if (hasApiSession) {
-        const savedProfile =
+        let savedProfile =
           await authApi.updateMe({
             full_name: normalizedDisplayName,
             bio: normalizedBio || null,
@@ -366,7 +373,16 @@ function ProfileSetupPage() {
               normalizedNeighborhood || null,
           });
 
+        if (selectedPhotoFile) {
+          savedProfile =
+            await authApi.uploadProfilePhoto(
+              selectedPhotoFile,
+            );
+        }
+
         savedUserId = savedProfile.id;
+        savedPhotoUrl =
+          savedProfile.photo_url ?? null;
       } else if (!hasMockSession) {
         setRedirectToLogin(true);
         return;
@@ -378,6 +394,9 @@ function ProfileSetupPage() {
         bio: normalizedBio,
         neighborhood: normalizedNeighborhood,
         photoFileName,
+        ...(hasApiSession
+          ? { photoUrl: savedPhotoUrl }
+          : {}),
         profileSetupComplete: true,
       };
 
@@ -584,8 +603,8 @@ function ProfileSetupPage() {
 
           <p className="auth-helper-text">
             Accepted photo types: JPG, PNG, or WebP. Maximum
-            size: 2 MB. The selected file is preview-only until
-            profile-photo upload support is available.
+            size: 5 MB. The selected file is uploaded when
+            you save your profile.
           </p>
 
           <button

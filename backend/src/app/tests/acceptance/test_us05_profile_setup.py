@@ -3,16 +3,18 @@
 Note: the API has no dedicated "profile setup" endpoint distinct from "edit
 profile" (both are ``PUT /api/v1/auth/me``; see app/api/v1/auth.py). Scenarios
 that depend on a setup-vs-edit distinction, or on fields the schema doesn't
-have (required display name, photo upload), are marked as gaps below rather
-than silently skipped, since they only manifest on the actual UserUpdate
-schema (app/schemas/user.py) which currently allows every field to be
-optional and unvalidated.
+have (required display name), are marked as gaps below rather than silently
+skipped, since they only manifest on the actual UserUpdate schema
+(app/schemas/user.py). Profile-photo upload IS implemented (POST
+``/api/v1/auth/me/photo``) — see TestScenario4.
 """
+
+from io import BytesIO
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.tests.acceptance.helpers import auth_header
+from app.tests.acceptance.helpers import auth_header, fake_photo
 from app.tests.factories import UserFactory
 
 pytestmark = pytest.mark.acceptance
@@ -71,15 +73,60 @@ class TestScenario3DisplayNameExceedsMaxLength:
 
 
 class TestScenario4ProfilePhotoUploadFailsValidation:
-    @pytest.mark.skip(
-        reason="not implemented: there is no profile-photo upload endpoint. "
-        "UserUpdate.photo_url (app/schemas/user.py) is a plain string field set "
-        "directly to whatever URL the client sends -- no file upload, no image/size "
-        "validation exists for user profile photos (tool listing photos have their "
-        "own separate upload+validation path in app/api/v1/tools.py)."
-    )
-    async def test_non_image_or_oversized_photo_rejected(self) -> None:
-        raise NotImplementedError
+    async def test_non_image_or_oversized_photo_rejected(
+        self, client, db_session: AsyncSession
+    ) -> None:
+        """Given the user attempts to upload a photo that is not an image or
+        exceeds the size limit, the system rejects the photo."""
+        user = await UserFactory.create_async(db_session)
+
+        # Non-image bytes declared as image/png -> magic-byte mismatch.
+        non_image = await client.post(
+            "/api/v1/auth/me/photo",
+            files=[("photo", ("fake.png", BytesIO(b"this is not an image"), "image/png"))],
+            headers=auth_header(user.id),
+        )
+        assert non_image.status_code == 422
+        await db_session.refresh(user)
+        assert user.photo_url is None
+
+        # Oversized file (over the 5 MB default) -> rejected.
+        oversized = await client.post(
+            "/api/v1/auth/me/photo",
+            files=[
+                (
+                    "photo",
+                    (
+                        "big.jpg",
+                        BytesIO(b"\xff\xd8\xff\xe0" + b"\x00" * (5 * 1024 * 1024)),
+                        "image/jpeg",
+                    ),
+                )
+            ],
+            headers=auth_header(user.id),
+        )
+        assert oversized.status_code == 422
+        await db_session.refresh(user)
+        assert user.photo_url is None
+
+    async def test_valid_photo_uploaded_and_visible(self, client, db_session: AsyncSession) -> None:
+        """A valid image upload sets photo_url to a /uploads/ path."""
+        user = await UserFactory.create_async(db_session)
+
+        response = await client.post(
+            "/api/v1/auth/me/photo",
+            files=[("photo", fake_photo("profile.jpg"))],
+            headers=auth_header(user.id),
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["photo_url"].startswith("/uploads/")
+        assert data["id"] == str(user.id)
+
+        me = await client.get("/api/v1/auth/me", headers=auth_header(user.id))
+        assert me.status_code == 200
+        assert me.json()["photo_url"] == data["photo_url"]
 
 
 class TestScenario5UnauthenticatedCannotAccessProfileSetup:

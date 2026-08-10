@@ -20,7 +20,7 @@ import {
 
 const maxDisplayNameLength = 40;
 const maxNeighborhoodLength = 255;
-const maxPhotoSizeBytes = 2 * 1024 * 1024;
+const maxPhotoSizeBytes = 5 * 1024 * 1024;
 
 const allowedPhotoTypes = [
   'image/jpeg',
@@ -98,15 +98,10 @@ function clearInvalidAuthentication() {
  * - Saves only through PUT /auth/me, so no other member ID can be targeted.
  * - Supports display name, bio, and neighborhood editing.
  * - Supports removal of an existing photo URL.
- * - Validates selected replacement-photo files without changing the
- *   existing saved photo.
+ * - Uploads a selected replacement photo through POST /auth/me/photo;
+ *   invalid selections are rejected without changing the existing photo.
  * - Redirects unauthenticated users to Login.
  * - Silently performs no action when no saved fields changed.
- *
- * Backend limitation:
- * - The API accepts photo_url but does not provide a profile-photo
- *   file-upload endpoint. A selected replacement file is therefore
- *   validated and previewed only; the existing saved photo is preserved.
  */
 function EditProfilePage() {
   const hasApiSession = hasTokens();
@@ -137,6 +132,8 @@ function EditProfilePage() {
     selectedPhotoFileName,
     setSelectedPhotoFileName,
   ] = useState('');
+  const [selectedPhotoFile, setSelectedPhotoFile] =
+    useState<File | null>(null);
 
   const [
     initialProfile,
@@ -337,6 +334,7 @@ function EditProfilePage() {
 
     if (!selectedFile) {
       setSelectedPhotoFileName('');
+      setSelectedPhotoFile(null);
       return;
     }
 
@@ -347,6 +345,7 @@ function EditProfilePage() {
     ) {
       event.target.value = '';
       setSelectedPhotoFileName('');
+      setSelectedPhotoFile(null);
 
       setErrorMessage(
         'Profile photo must be a JPG, PNG, or WebP image. Your existing photo was not changed.',
@@ -361,9 +360,10 @@ function EditProfilePage() {
     ) {
       event.target.value = '';
       setSelectedPhotoFileName('');
+      setSelectedPhotoFile(null);
 
       setErrorMessage(
-        'Profile photo must be 2 MB or smaller. Your existing photo was not changed.',
+        'Profile photo must be 5 MB or smaller. Your existing photo was not changed.',
       );
 
       return;
@@ -372,6 +372,7 @@ function EditProfilePage() {
     setSelectedPhotoFileName(
       selectedFile.name,
     );
+    setSelectedPhotoFile(selectedFile);
   }
 
   /**
@@ -383,6 +384,7 @@ function EditProfilePage() {
     setErrorMessage('');
     setSuccessMessage('');
     setSelectedPhotoFileName('');
+    setSelectedPhotoFile(null);
     setPhotoUrl(null);
   }
 
@@ -467,21 +469,6 @@ function EditProfilePage() {
       return;
     }
 
-    /**
-     * A selected file cannot be persisted until the backend provides
-     * a profile-photo upload endpoint.
-     */
-    if (
-      !savedFieldsChanged &&
-      selectedPhotoFileName
-    ) {
-      setErrorMessage(
-        'Profile-photo upload is not available yet. Your existing profile photo remains unchanged.',
-      );
-
-      return;
-    }
-
     setIsSaving(true);
 
     try {
@@ -495,7 +482,7 @@ function EditProfilePage() {
       };
 
       if (hasApiSession) {
-        const savedProfile =
+        let savedProfile =
           await authApi.updateMe({
             full_name:
               normalizedDisplayName,
@@ -506,6 +493,13 @@ function EditProfilePage() {
             photo_url:
               photoUrl,
           });
+
+        if (selectedPhotoFile) {
+          savedProfile =
+            await authApi.uploadProfilePhoto(
+              selectedPhotoFile,
+            );
+        }
 
         savedUserId = savedProfile.id;
 
@@ -568,11 +562,10 @@ function EditProfilePage() {
       );
       setInitialProfile(savedSnapshot);
       setSelectedPhotoFileName('');
+      setSelectedPhotoFile(null);
 
       setSuccessMessage(
-        selectedPhotoFileName
-          ? 'Profile details saved. The selected photo was not uploaded because profile-photo upload is not available yet.'
-          : 'Profile changes saved successfully.',
+        'Profile changes saved successfully.',
       );
     } catch (error) {
       if (
@@ -751,9 +744,8 @@ function EditProfilePage() {
 
           <p className="auth-helper-text">
             Accepted types: JPG, PNG, or WebP.
-            Maximum size: 2 MB. A selected replacement
-            file is preview-only until backend upload
-            support is available.
+            Maximum size: 5 MB. The selected file
+            is uploaded when you save your changes.
           </p>
 
           {photoUrl && (

@@ -3,6 +3,7 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from fastapi import UploadFile
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -443,6 +444,16 @@ class AuthService:
         ``None`` values clear the corresponding field.
         """
         return await UserService().update_profile(db, user, updates=updates)
+
+    async def upload_profile_photo(
+        self,
+        db: AsyncSession,
+        user: User,
+        *,
+        file: UploadFile,
+    ) -> User:
+        """Validate and attach an uploaded profile photo to the current user."""
+        return await UserService().upload_profile_photo(db, user, file=file)
 
     async def delete_me(
         self,

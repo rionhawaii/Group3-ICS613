@@ -3,6 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
+from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,7 @@ from app.models.enums import (
 from app.models.reservation import Reservation
 from app.models.tool import Tool
 from app.models.user import User
+from app.services.photo_storage import PhotoStorageService
 
 
 def _anonymize_user(user: User) -> None:
@@ -174,6 +176,9 @@ async def _guard_and_cleanup(
 class UserService:
     """Business logic for user profiles."""
 
+    def __init__(self, photo_storage: PhotoStorageService | None = None) -> None:
+        self.photo_storage = photo_storage or PhotoStorageService()
+
     async def get_by_id(self, db: AsyncSession, user_id: uuid.UUID) -> User | None:
         """Fetch a non-deleted user by primary key."""
         result = await db.execute(
@@ -239,6 +244,35 @@ class UserService:
             else:
                 # Normalize empty strings to NULL for optional text fields.
                 setattr(user, field, value if value != "" else None)
+        user.updated_at = datetime.now(UTC)
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+        return user
+
+    async def upload_profile_photo(
+        self,
+        db: AsyncSession,
+        user: User,
+        *,
+        file: UploadFile,
+    ) -> User:
+        """Validate and persist an uploaded profile photo, replacing the previous one.
+
+        Reuses the tool-photo pipeline (magic-byte + size validation, async
+        disk write served from ``/uploads``). The previous photo file is
+        removed when it was itself an uploaded file; external URL strings
+        set via ``PUT /auth/me`` are left untouched.
+        """
+        content = await file.read()
+        content_type = file.content_type
+        PhotoStorageService.validate_image(content_type, len(content), content=content)
+
+        url = await self.photo_storage.save(content, content_type or "image/jpeg")
+        if user.photo_url:
+            self.photo_storage.delete(user.photo_url)
+
+        user.photo_url = url
         user.updated_at = datetime.now(UTC)
         db.add(user)
         await db.flush()

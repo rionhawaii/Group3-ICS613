@@ -366,7 +366,7 @@ python run.py --help    # full uvicorn CLI help
 pytest src/app/tests/ -q
 ```
 
-All tests should pass (366 passed, 19 skipped, 9 xfailed in the current suite). The test database (`toolsharing_test`) is created automatically by `db/init/00-create-test-db.sql` when the Docker container first starts. `pyproject.toml` configures `pythonpath = ["src"]` and the test conftest sets default env vars, so no `PYTHONPATH` or `.env` setup is needed.
+All tests should pass (373 passed, 17 skipped, 9 xfailed in the current suite). The test database (`toolsharing_test`) is created automatically by `db/init/00-create-test-db.sql` when the Docker container first starts. `pyproject.toml` configures `pythonpath = ["src"]` and the test conftest sets default env vars, so no `PYTHONPATH` or `.env` setup is needed.
 
 Run a single test file:
 
