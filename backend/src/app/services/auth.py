@@ -24,6 +24,7 @@ from app.models.email_verification import EmailVerificationToken
 from app.models.enums import InviteStatus, UserStatus
 from app.models.invite import InviteToken
 from app.models.password_reset import PasswordResetToken
+from app.models.revoked_token import RevokedToken
 from app.models.user import User
 from app.services.email import EmailService
 from app.services.user import UserService
@@ -335,19 +336,22 @@ class AuthService:
             "token_type": "bearer",
         }
 
-    async def logout(self, db: AsyncSession, user: User) -> None:
-        """Stateless logout.
+    async def logout(self, db: AsyncSession, *, user: User, jti: str, expires_at: datetime) -> None:
+        """Revoke the presented access token by recording its ``jti``.
 
-        The JWT itself remains technically valid until it expires (the client
-        should discard it). A future Redis-backed JTI deny-list can plug
-        in here to invalidate access tokens before their natural expiry
-        without changing this signature.
+        Adds the token to the ``revoked_tokens`` deny-list so
+        ``get_current_user`` rejects it on the next request, even though the
+        JWT itself remains cryptographically valid until natural expiry.
+        Idempotent: logging out twice with the same token is a no-op the
+        second time. We deliberately avoid touching
+        ``password_changed_at`` here because that would log every active
+        user out (e.g. from multiple devices) on each logout.
         """
-        # No-op: clients are expected to drop the token. We deliberately
-        # avoid touching ``password_changed_at`` here because that would
-        # log every active user out (e.g. from multiple devices) on each
-        # logout. Use a JTI deny-list if/when immediate revocation is
-        # required.
+        existing = await db.execute(select(RevokedToken.id).where(RevokedToken.jti == jti))
+        if existing.scalar_one_or_none() is not None:
+            return None
+        db.add(RevokedToken(jti=jti, user_id=user.id, expires_at=expires_at))
+        await db.flush()
         return None
 
     # ------------------------------------------------------------------

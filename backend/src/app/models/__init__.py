@@ -14,6 +14,7 @@ from app.models.password_reset import PasswordResetToken
 from app.models.photo import Photo
 from app.models.reservation import Reservation
 from app.models.review import Review
+from app.models.revoked_token import RevokedToken
 from app.models.tool import Tool
 from app.models.user import User
 
@@ -22,6 +23,7 @@ __all__ = [
     "InviteToken",
     "EmailVerificationToken",
     "PasswordResetToken",
+    "RevokedToken",
     "Tool",
     "Photo",
     "Reservation",

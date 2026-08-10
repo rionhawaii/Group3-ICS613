@@ -1,4 +1,5 @@
-import { test, expect, loginAsMockUser } from '../fixtures';
+import { test, expect, loginAsMockUser, loginAsAdmin, logoutMockUser } from '../fixtures';
+import { apiGet, apiPut } from '../api-helpers';
 
 // Covers ProfileSetupPage (frontend issues #95, #97, #98, #99, #100).
 test.describe('ProfileSetupPage', () => {
@@ -66,4 +67,43 @@ test.describe('ProfileSetupPage', () => {
 
     await expect(page.locator('.form-error')).toContainText('must be 2 MB or smaller');
   });
+
+  // Regression test for a bug Loreto found in manual testing (issue #271):
+  // a brand-new user's setup page can show a PREVIOUS user's bio. Root
+  // cause (ProfileSetupPage.tsx): every successful save writes the bio to
+  // a single, unscoped localStorage key (`mockUserProfile`), and the page
+  // falls back to that cached value whenever the backend's own bio is
+  // null -- but unlike the adjacent `profileSetupComplete` flag, that
+  // fallback has no `cachedProfile.userId === currentUser.id` ownership
+  // check. Logout only clears auth tokens, never this cache, so it
+  // survives a full login/logout/login cycle in the same browser.
+  test.fail(
+    "BUG: a previous user's bio leaks into a different user's setup page (#271)",
+    async ({ page }) => {
+      const leakedBio = `admin-private-bio-${Date.now()}`;
+
+      // User A (admin) saves a distinctive bio -- this writes it to both
+      // the backend and the unscoped localStorage cache.
+      await loginAsAdmin(page, '/profile/setup');
+      await page.getByLabel('Short Bio').fill(leakedBio);
+      await page.getByRole('button', { name: 'Save Profile' }).click();
+      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 5000 });
+
+      // Same browser, different user: logout clears tokens only, never
+      // the profile cache, then log in as someone else entirely.
+      await logoutMockUser(page);
+      await loginAsMockUser(page);
+
+      // Force a known-clean starting point regardless of what earlier
+      // tests in this suite already saved for this account.
+      await apiPut(page, '/api/v1/auth/me', { bio: null });
+      const me = await apiGet<{ bio: string | null }>(page, '/api/v1/auth/me');
+      expect(me.bio).toBeNull();
+
+      await page.goto('/profile/setup');
+
+      // Should be blank -- User B never set a bio. Currently shows User A's.
+      await expect(page.getByLabel('Short Bio')).toHaveValue('');
+    },
+  );
 });

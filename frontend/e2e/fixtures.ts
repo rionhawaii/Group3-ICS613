@@ -34,6 +34,29 @@ export async function loginAsMockUser(page: Page, path = '/dashboard') {
 }
 
 /**
+ * Login as the seeded "Demo Owner" account (member01@example.com).
+ *
+ * Distinct from loginAsMockUser (member02@example.com) -- some scenarios
+ * need to be logged in as the specific owner of a particular seeded tool
+ * (see scripts/seed_dev.py: even-indexed tools, e.g. "Cordless Drill" and
+ * "Ladder", are owned by member01; odd-indexed ones by member02).
+ */
+export async function loginAsMember01(page: Page, path = '/dashboard') {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('member01@example.com');
+  await page.getByLabel('Password').fill('devpass123');
+  await page.getByRole('button', { name: 'Login' }).click();
+  await page.waitForURL(/\/dashboard$/);
+  const token = await page.evaluate(() => window.localStorage.getItem('access_token'));
+  if (!token) {
+    throw new Error('Login did not produce an access_token in localStorage');
+  }
+  if (path !== '/dashboard') {
+    await page.goto(path);
+  }
+}
+
+/**
  * Login as the seeded admin user for tests that need admin privileges.
  *
  * Uses:

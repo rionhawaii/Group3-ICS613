@@ -56,6 +56,164 @@ export async function apiDelete(page: Page, path: string): Promise<void> {
   }
 }
 
+/** Authenticated PUT against the real backend, using the current page's logged-in access token. */
+export async function apiPut<T = unknown>(page: Page, path: string, data: unknown): Promise<T> {
+  const token = await page.evaluate(() => window.localStorage.getItem('access_token'));
+  const response = await page.request.put(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    data,
+  });
+  if (!response.ok()) {
+    throw new Error(`PUT ${path} failed: ${response.status()} ${await response.text()}`);
+  }
+  return response.json();
+}
+
+/** Authenticated POST (JSON body) against the real backend, using the current page's logged-in access token. */
+export async function apiPost<T = unknown>(page: Page, path: string, data?: unknown): Promise<T> {
+  const token = await page.evaluate(() => window.localStorage.getItem('access_token'));
+  const response = await page.request.post(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    data,
+  });
+  if (!response.ok()) {
+    throw new Error(`POST ${path} failed: ${response.status()} ${await response.text()}`);
+  }
+  return response.json();
+}
+
+interface CreatedTool {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
+/**
+ * A real, minimal 1x1 transparent PNG (not just a file with an image/*
+ * MIME type) -- the backend sniffs actual file content, not just the
+ * client-declared Content-Type, so an arbitrary byte string is rejected
+ * with 422 "File contents do not match any supported image format."
+ */
+export const FAKE_PNG = {
+  name: 'e2e-fixture.png',
+  mimeType: 'image/png',
+  buffer: Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  ),
+};
+
+/**
+ * Create a disposable tool listing owned by the currently logged-in user,
+ * via a real multipart POST /tools (one fake JPEG photo, satisfying the
+ * "at least 1 photo" requirement). Used by tests that need to mutate a
+ * listing (edit, deactivate, add/remove photos) without touching the
+ * shared seed_dev.py fixtures that other spec files depend on.
+ */
+export async function createTestTool(
+  page: Page,
+  name: string,
+  overrides?: { category?: string; condition?: string; description?: string },
+): Promise<CreatedTool> {
+  const token = await page.evaluate(() => window.localStorage.getItem('access_token'));
+  const response = await page.request.post('/api/v1/tools', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    multipart: {
+      name,
+      category: overrides?.category ?? 'POWER_TOOLS',
+      condition: overrides?.condition ?? 'GOOD',
+      description: overrides?.description ?? 'Created by an e2e test.',
+      photos: FAKE_PNG,
+    },
+  });
+  if (!response.ok()) {
+    throw new Error(`POST /api/v1/tools failed: ${response.status()} ${await response.text()}`);
+  }
+  return response.json();
+}
+
+async function loginForToken(page: Page, email: string, password = 'devpass123'): Promise<string> { // pragma: allowlist secret -- dev-only seed password, not a real credential
+  const response = await page.request.post('/api/v1/auth/login', { data: { email, password } });
+  if (!response.ok()) {
+    throw new Error(`login failed for ${email}: ${response.status()} ${await response.text()}`);
+  }
+  const body = (await response.json()) as { access_token: string };
+  return body.access_token;
+}
+
+/**
+ * Create a fresh, disposable tool with a genuinely PICKED_UP reservation on
+ * it, via direct API calls with two independent bearer tokens (owner +
+ * borrower) -- not tied to whichever account happens to be logged into
+ * `page` right now. Needed because the seeded PICKED_UP fixture
+ * (scripts/seed_dev.py's "Ladder") drifts under repeated e2e runs against a
+ * shared, non-reset backend: other tests return it, re-deactivate it, etc.,
+ * so relying on it as a fixed precondition is not reliable.
+ */
+export async function createPickedUpTool(
+  page: Page,
+  name: string,
+  ownerEmail = 'member01@example.com',
+  borrowerEmail = 'member02@example.com',
+): Promise<{ toolId: string; reservationId: string }> {
+  const ownerToken = await loginForToken(page, ownerEmail);
+  const borrowerToken = await loginForToken(page, borrowerEmail);
+
+  const toolResponse = await page.request.post('/api/v1/tools', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    multipart: {
+      name,
+      category: 'POWER_TOOLS',
+      condition: 'GOOD',
+      description: 'Created by an e2e test (picked-up fixture).',
+      photos: FAKE_PNG,
+    },
+  });
+  if (!toolResponse.ok()) {
+    throw new Error(`create tool failed: ${toolResponse.status()} ${await toolResponse.text()}`);
+  }
+  const tool = (await toolResponse.json()) as CreatedTool;
+
+  // The backend compares reservation dates against "today" in HST
+  // (UTC-10), but `Date.toISOString()` is UTC -- for roughly 10 hours a day
+  // (evening HST, already tomorrow in UTC) that mismatch sends a start_date
+  // one day ahead of the backend's HST "today", and mark-picked-up then
+  // rejects it as being before the start date. Shift by the HST offset
+  // before slicing so the calendar date always matches the backend's.
+  const HST_OFFSET_MS = 10 * 60 * 60 * 1000;
+  const fmt = (d: Date) => new Date(d.getTime() - HST_OFFSET_MS).toISOString().slice(0, 10);
+  const start = new Date();
+  const end = new Date();
+  end.setDate(end.getDate() + 5);
+
+  const resResponse = await page.request.post('/api/v1/reservations', {
+    headers: { Authorization: `Bearer ${borrowerToken}` },
+    data: { tool_id: tool.id, start_date: fmt(start), end_date: fmt(end) },
+  });
+  if (!resResponse.ok()) {
+    throw new Error(`create reservation failed: ${resResponse.status()} ${await resResponse.text()}`);
+  }
+  const reservation = (await resResponse.json()) as { id: string };
+
+  const approveResponse = await page.request.post(
+    `/api/v1/reservations/${reservation.id}/approve`,
+    { headers: { Authorization: `Bearer ${ownerToken}` } },
+  );
+  if (!approveResponse.ok()) {
+    throw new Error(`approve failed: ${approveResponse.status()} ${await approveResponse.text()}`);
+  }
+
+  const pickupResponse = await page.request.post(
+    `/api/v1/reservations/${reservation.id}/mark-picked-up`,
+    { headers: { Authorization: `Bearer ${borrowerToken}` } },
+  );
+  if (!pickupResponse.ok()) {
+    throw new Error(`mark-picked-up failed: ${pickupResponse.status()} ${await pickupResponse.text()}`);
+  }
+
+  return { toolId: tool.id, reservationId: reservation.id };
+}
+
 interface ReviewSummary {
   id: string;
   reviewer_id: string;

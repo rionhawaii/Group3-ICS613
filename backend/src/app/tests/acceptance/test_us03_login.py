@@ -82,15 +82,6 @@ class TestScenario4Logout:
         response = await client.post("/api/v1/auth/logout", headers=auth_header(user.id))
         assert response.status_code == 200
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: AuthService.logout is a documented no-op (see its docstring) — "
-        "the access token stays valid until natural expiry, so protected pages remain "
-        "reachable after 'logout' until the client discards the token client-side. This "
-        "contradicts the scenario's 'protected member pages are no longer accessible' "
-        "clause. Needs a JTI deny-list (or short-lived access tokens + refresh revocation) "
-        "before this can pass; flagging so the gap isn't silently lost.",
-    )
     async def test_protected_route_rejected_after_logout(
         self, client, db_session: AsyncSession
     ) -> None:

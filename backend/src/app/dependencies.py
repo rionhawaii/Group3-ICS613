@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -15,6 +16,7 @@ from app.core.exceptions import (
 )
 from app.core.security import decode_token
 from app.db.session import get_db
+from app.models.revoked_token import RevokedToken
 from app.models.user import User
 from app.services.user import UserService
 
@@ -40,6 +42,12 @@ async def get_current_user(
 
     if payload.get("type") != "access":
         raise AuthenticationError("Invalid token type")
+
+    jti = payload.get("jti")
+    if jti:
+        revoked = await db.execute(select(RevokedToken.id).where(RevokedToken.jti == jti))
+        if revoked.scalar_one_or_none() is not None:
+            raise AuthenticationError("Token has been revoked")
 
     user_id = payload.get("sub")
     if not user_id:

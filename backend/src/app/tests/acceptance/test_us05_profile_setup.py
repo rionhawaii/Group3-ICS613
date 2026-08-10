@@ -86,14 +86,3 @@ class TestScenario5UnauthenticatedCannotAccessProfileSetup:
     async def test_returns_401(self, client) -> None:
         response = await client.put("/api/v1/auth/me", json={"full_name": "Someone"})
         assert response.status_code == 401
-
-
-class TestScenario6AlreadyCompletedProfileRedirectsToEdit:
-    @pytest.mark.skip(
-        reason="not implemented: there is only one PUT /auth/me endpoint used for "
-        "both initial setup and later edits -- there is no 'profile completed' flag "
-        "or distinct setup route to redirect away from. This is a frontend routing "
-        "concern once such a flag exists, not currently API-testable."
-    )
-    async def test_redirects_to_edit_profile(self) -> None:
-        raise NotImplementedError

@@ -61,12 +61,9 @@ class TestScenario1SuccessfullyEditWithNoPickedUpReservation:
         )
         assert response.status_code == 200
 
-    @pytest.mark.skip(
-        reason="not implemented: no latest_return_time/lending_rules/notes fields exist "
-        "(see US8 Scenario 1 note)."
-    )
-    async def test_lending_fields_updated_and_visible(self) -> None:
-        raise NotImplementedError
+
+# Scenario "lending fields updated and visible" is descoped -- see US8
+# module docstring; no latest_return_time/lending_rules/notes fields exist.
 
 
 class TestScenario2CannotEditWhilePickedUp:
@@ -219,12 +216,8 @@ class TestScenario9UnauthenticatedCannotEdit:
         assert response.status_code == 401
 
 
-class TestScenario10EditWithInvalidLatestReturnTimeRejected:
-    @pytest.mark.skip(
-        reason="not implemented: no latest_return_time field exists (see US8 Scenario 5)."
-    )
-    async def test_invalid_time_format_rejected_on_edit(self) -> None:
-        raise NotImplementedError
+# Scenario 10 (invalid latest_return_time rejected on edit) is descoped --
+# see US8 module docstring; no such field exists.
 
 
 class TestScenario11MessageThreadsAccessibleAfterDeactivation:
