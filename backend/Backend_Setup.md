@@ -366,7 +366,7 @@ python run.py --help    # full uvicorn CLI help
 pytest src/app/tests/ -q
 ```
 
-All tests should pass (373 passed, 17 skipped, 9 xfailed in the current suite). The test database (`toolsharing_test`) is created automatically by `db/init/00-create-test-db.sql` when the Docker container first starts. `pyproject.toml` configures `pythonpath = ["src"]` and the test conftest sets default env vars, so no `PYTHONPATH` or `.env` setup is needed.
+All tests should pass (384 passed, 0 skipped, 0 xfailed in the current suite). The test database (`toolsharing_test`) is created automatically by `db/init/00-create-test-db.sql` when the Docker container first starts. `pyproject.toml` configures `pythonpath = ["src"]` and the test conftest sets default env vars, so no `PYTHONPATH` or `.env` setup is needed.
 
 Run a single test file:
 
@@ -376,11 +376,11 @@ pytest src/app/tests/acceptance/test_us01_register.py -v
 
 ### What these tests cover (and what they do NOT cover)
 
-The 394 tests in `src/app/tests/` are **acceptance and auxiliary tests**. They verify that each API endpoint behaves correctly — status codes, request validation, response shapes, database state changes, and business rules (e.g., overlap rejection via the EXCLUDE constraint, magic-byte photo validation, CancellerType CHECK constraint). They run automatically with pytest and do not require a separate server process.
+The 384 tests in `src/app/tests/` are **acceptance and auxiliary tests**. They verify that each API endpoint behaves correctly — status codes, request validation, response shapes, database state changes, and business rules (e.g., overlap rejection via the EXCLUDE constraint, magic-byte photo validation, CancellerType CHECK constraint). They run automatically with pytest and do not require a separate server process.
 
 **Test breakdown:**
-- 283 acceptance tests (`src/app/tests/acceptance/`) — verify user story scenarios via API calls
-- 97 auxiliary tests (`src/app/tests/auxiliary/`) — security/permission/edge-case coverage with no user-story mapping (rate limiting, SECRET_KEY validation, audit-log detail, admin user directory, etc.)
+- 273 acceptance tests (`src/app/tests/acceptance/`) — verify user story scenarios via API calls
+- 111 auxiliary tests (`src/app/tests/auxiliary/`) — security/permission/edge-case coverage with no user-story mapping (rate limiting, SECRET_KEY validation, audit-log detail, admin user directory, etc.)
 
 **These tests cover user-facing acceptance scenarios.** Each acceptance test file maps 1:1 to a user story (US01–US34 + admin invite) with one class per scenario, following the convention in `src/app/tests/acceptance/__init__.py`.
 
@@ -388,8 +388,8 @@ In short:
 
 | Test type | Owner | Purpose | Where it lives |
 |-----------|-------|---------|----------------|
-|| Acceptance tests | QA lead | Verify user story scenarios via API calls | `src/app/tests/acceptance/` (283 tests, pytest) |
-|| Auxiliary tests | QA lead | Security/permission/edge-case coverage with no user-story mapping | `src/app/tests/auxiliary/` (97 tests, pytest) |
+|| Acceptance tests | QA lead | Verify user story scenarios via API calls | `src/app/tests/acceptance/` (273 tests, pytest) |
+|| Auxiliary tests | QA lead | Security/permission/edge-case coverage with no user-story mapping | `src/app/tests/auxiliary/` (111 tests, pytest) |
 || E2E browser automation | QA lead | Drive a full demo path through the UI | `frontend/e2e/` (Playwright, runs in CI) |
 
 If you change backend code, run the pytest suite to make sure the acceptance and auxiliary tests still pass.
@@ -520,7 +520,7 @@ backend/
 │       ├── models/           # SQLAlchemy ORM models (13 models)
 │       ├── schemas/          # Pydantic request/response schemas
 │       ├── services/         # Business logic layer
-│       └── tests/            # Test suite (394 tests: 283 acceptance + 111 auxiliary)
+│       └── tests/            # Test suite (384 tests: 273 acceptance + 111 auxiliary)
 ├── .env                      # Your local environment (gitignored)
 └── .env.example              # Safe template for .env
 ```
