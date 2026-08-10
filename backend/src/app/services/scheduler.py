@@ -4,8 +4,9 @@ Jobs:
   - auto_cancel_overdue_pickups: cancels APPROVED reservations not picked up
     within 3 days of the start date.
   - auto_escalate_overdue_returns: notifies the borrower about PICKED_UP
-    reservations past the 7-day return window, then hard-resolves them
-    (force_return) after 14 days to prevent infinite notification loops.
+    reservations past the 7-day return window, then alerts admins (instead
+    of force-returning) once a reservation is overdue by 14+ days. The
+    reservation stays PICKED_UP indefinitely until an admin resolves it.
   - cleanup_expired_tokens: deletes verification / password-reset / invite
     tokens that have been expired for more than 30 days (bounds table growth).
 """
@@ -30,6 +31,7 @@ from app.models.invite import InviteToken
 from app.models.notification import Notification
 from app.models.password_reset import PasswordResetToken
 from app.models.reservation import Reservation
+from app.models.user import User
 from app.services.notification import NotificationService
 
 logger = get_logger(__name__)
@@ -125,62 +127,60 @@ class SchedulerService:
                     ),
                     payload={"reservation_id": str(res.id)},
                 )
+
+                # Notify owner
+                await NotificationService().create(
+                    db,
+                    user_id=res.tool.owner_id,
+                    type_=NotificationType.RESERVATION_CANCELLED,
+                    title="Reservation auto-cancelled",
+                    body=(
+                        f"Your listing ({res.tool.name}) had a reservation "
+                        f"automatically cancelled because it was not picked up by "
+                        f"{res.start_date}."
+                    ),
+                    payload={"reservation_id": str(res.id)},
+                )
             if overdue:
                 logger.info("Auto-cancelled %d overdue pickups", len(overdue))
 
     async def auto_escalate_overdue_returns(self) -> None:
         """Handle PICKED_UP reservations past the return window.
 
-        Two-phase escalation so we don't loop forever:
+        Two-phase escalation, neither phase ever force-changes reservation
+        state -- only an admin can do that (via the manual
+        admin-force-return endpoint):
           1. **Soft** (after escalation_days): notify the borrower once per
              ``escalation_interval_hours`` window (defaults to 24 h, i.e. one
              notification per day). Deduped by querying for an existing
              notification of the same type on the same reservation.
-          2. **Hard** (after hard_escalation_days): force-resolve the
-             reservation via the same path admins use for dispute resolution.
-             This releases the tool and stops future notifications.
+          2. **Hard** (after hard_escalation_days): the reservation is left
+             untouched (still PICKED_UP) indefinitely.
+
+        Both soft- and hard-bucket reservations feed a shared admin-alert
+        step so a reservation overdue by 14+ days doesn't fall into a dead
+        zone with no notification to anyone once it ages out of the soft
+        window.
         """
         settings = get_settings()
         escalation_days = settings.scheduler_escalation_days
         hard_escalation_days = settings.scheduler_hard_escalation_days
         soft_cutoff = utc_to_hst(datetime.now(UTC)).date() - timedelta(days=escalation_days)
         hard_cutoff = utc_to_hst(datetime.now(UTC)).date() - timedelta(days=hard_escalation_days)
+        now = datetime.now(UTC)
         async with get_session() as db:
-            # Hard-resolve anything that has been overdue too long.
+            # Severely overdue: left PICKED_UP indefinitely until an admin
+            # resolves it via the manual admin-force-return endpoint.
             hard_result = await db.execute(
                 select(Reservation).where(
                     Reservation.state == ReservationState.PICKED_UP,
                     Reservation.end_date < hard_cutoff,
                 )
             )
-            now = datetime.now(UTC)
-            hard_count = 0
-            for res in hard_result.scalars().all():
-                res.state = ReservationState.RETURNED
-                res.returned_at = now
-                res.force_resolved_at = now
-                res.force_resolution_reason = (
-                    f"Auto force-returned after {hard_escalation_days} days overdue"
-                )
-                res.updated_at = now
-                db.add(res)
-                hard_count += 1
-
-                await NotificationService().create(
-                    db,
-                    user_id=res.borrower_id,
-                    type_=NotificationType.RESERVATION_RETURNED,
-                    title="Tool auto-returned",
-                    body=(
-                        f"Tool {res.tool_id} was auto-returned because it was "
-                        f"overdue by more than {hard_escalation_days} days. "
-                        "Please contact an admin if this is wrong."
-                    ),
-                    payload={"reservation_id": str(res.id), "auto": True},
-                )
+            hard_reservations = list(hard_result.scalars().all())
 
             # Soft-notify anything that just crossed the soft window
-            # (and is not already in the hard list). Deduped per user: skip
+            # (and is not already in the hard bucket). Deduped per user: skip
             # if a RESERVATION_OVERDUE notification was already sent to this
             # user within the dedup window. (Per-reservation dedup would
             # need a JSON-path query on the payload column; per-user is
@@ -194,8 +194,9 @@ class SchedulerService:
                     Reservation.end_date >= hard_cutoff,
                 )
             )
+            soft_reservations = list(soft_result.scalars().all())
             soft_count = 0
-            for res in soft_result.scalars().all():
+            for res in soft_reservations:
                 # Dedup: any recent RESERVATION_OVERDUE notification for this user?
                 existing = await db.execute(
                     select(Notification.id)
@@ -220,15 +221,54 @@ class SchedulerService:
                     title="Tool return overdue",
                     body=(
                         f"Tool {res.tool_id} was due back on {res.end_date}. "
-                        f"Please return it within "
-                        f"{hard_escalation_days - escalation_days} days to "
-                        "avoid automatic return."
+                        "Please return it as soon as possible -- an admin "
+                        "has been notified and may follow up."
                     ),
                     payload={"reservation_id": str(res.id)},
                 )
 
-            if hard_count:
-                logger.info("Auto force-returned %d severely overdue items", hard_count)
+            # Shared admin-alert step: covers both buckets so a reservation
+            # doesn't stop generating any notification once it ages past the
+            # soft window's upper bound.
+            overdue_needing_admin = hard_reservations + soft_reservations
+            if overdue_needing_admin:
+                admin_result = await db.execute(
+                    select(User.id).where(User.is_admin.is_(True), User.deleted_at.is_(None))
+                )
+                admin_ids = list(admin_result.scalars().all())
+                if admin_ids:
+                    existing_admin_alert = await db.execute(
+                        select(Notification.id)
+                        .where(
+                            Notification.user_id.in_(admin_ids),
+                            Notification.type
+                            == NotificationType.RESERVATION_OVERDUE_ADMIN_ALERT.value,
+                            Notification.created_at >= dedup_cutoff,
+                        )
+                        .limit(1)
+                    )
+                    if existing_admin_alert.scalar_one_or_none() is None:
+                        for admin_id in admin_ids:
+                            await NotificationService().create(
+                                db,
+                                user_id=admin_id,
+                                type_=NotificationType.RESERVATION_OVERDUE_ADMIN_ALERT,
+                                title="Overdue reservations need review",
+                                body=(
+                                    f"{len(overdue_needing_admin)} reservation(s) are "
+                                    "overdue for return. Please review and use "
+                                    "admin-force-return where appropriate."
+                                ),
+                                payload={
+                                    "reservation_ids": [str(r.id) for r in overdue_needing_admin]
+                                },
+                            )
+
+            if hard_reservations:
+                logger.info(
+                    "%d severely overdue reservations remain PICKED_UP pending admin action",
+                    len(hard_reservations),
+                )
             if soft_count:
                 logger.info("Soft-escalated %d overdue returns", soft_count)
 

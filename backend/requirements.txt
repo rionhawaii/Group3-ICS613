@@ -8,7 +8,11 @@ uvicorn[standard]>=0.32,<0.40
 # Database (async primary, sync helper for legacy scripts and Alembic offline).
 # The [mypy] extra pulls in the SQLAlchemy mypy plugin so the [tool.mypy]
 # `plugins = ["sqlalchemy.ext.mypy.plugin"]` entry actually resolves.
-sqlalchemy[mypy]>=2.0,<2.1
+# The [asyncio] extra pulls in greenlet, required by SQLAlchemy's async
+# engine to bridge async/await onto DBAPI calls -- without it, a fresh
+# install fails at `python scripts/init_db.py` with
+# "ModuleNotFoundError: greenlet" even though asyncpg is installed.
+sqlalchemy[asyncio,mypy]>=2.0,<2.1
 asyncpg>=0.30,<1.0
 psycopg2-binary>=2.9,<3.0
 

@@ -12,6 +12,7 @@ from app.core.exceptions import ConflictError, NotFoundError, PermissionDeniedEr
 from app.models.enums import (
     CancellerType,
     DeactivationActor,
+    NotificationType,
     ReservationState,
     ToolCondition,
 )
@@ -21,6 +22,7 @@ from app.models.tool import Tool
 from app.models.user import User
 from app.services.admin import AdminService
 from app.services.category import CategoryService
+from app.services.notification import NotificationService
 from app.services.photo_storage import MAX_PHOTOS_PER_TOOL, PhotoStorageService
 
 
@@ -518,8 +520,9 @@ class ToolService:
                 Reservation.state.in_(canceled_states),
             )
         )
+        pending_reservations = list(pending.scalars().all())
         now = datetime.now(UTC)
-        for res in pending.scalars().all():
+        for res in pending_reservations:
             res.state = ReservationState.CANCELLED
             res.cancelled_by_type = CancellerType.OWNER.value
             res.cancelled_reason = f"Tool deactivated: {reason}"
@@ -527,6 +530,17 @@ class ToolService:
             db.add(res)
 
         db.add(tool)
+
+        # Notify the borrowers whose reservations were auto-cancelled.
+        for res in pending_reservations:
+            await NotificationService().create(
+                db,
+                user_id=res.borrower_id,
+                type_=NotificationType.RESERVATION_CANCELLED,
+                title="Reservation cancelled (listing deactivated)",
+                body=f"Your reservation for {tool.name} was cancelled because the listing was deactivated.",
+                payload={"reservation_id": str(res.id), "tool_id": str(tool.id)},
+            )
 
         # R1.C checklist: every deactivate (owner OR admin) is audit-logged.
         actor_role = "admin" if actor.is_admin else "owner"
@@ -569,6 +583,15 @@ class ToolService:
             db,
             admin=admin,
             tool_id=tool.id,
+        )
+
+        await NotificationService().create(
+            db,
+            user_id=tool.owner_id,
+            type_=NotificationType.TOOL_REACTIVATED,
+            title="Listing reactivated",
+            body=f"Your listing ({tool.name}) has been reactivated by an admin.",
+            payload={"tool_id": str(tool.id)},
         )
         await db.flush()
 

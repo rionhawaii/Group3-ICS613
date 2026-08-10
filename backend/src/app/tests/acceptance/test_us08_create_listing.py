@@ -10,8 +10,11 @@ whole gap is tracked once under User Story 28's acceptance module rather
 than repeated here.
 
 Also missing from the ``Tool`` model entirely: ``latest_return_time``,
-lending rules, and notes-for-borrowers. Scenarios that hinge on those fields
-are marked as gaps below.
+lending rules, and notes-for-borrowers. These were flagged as mock-only
+frontend fields with no backend equivalent early on and never built; the
+team decided against adding them (see QA_NOTES.local.md, 2026-08-09
+triage). Scenarios that hinged on those fields have been removed rather
+than left skipped.
 """
 
 import pytest
@@ -56,14 +59,6 @@ class TestScenario1SuccessfullyCreateNewListing:
         )
         assert browse.status_code == 200
         assert any(item["id"] == tool["id"] for item in browse.json()["items"])
-
-    @pytest.mark.skip(
-        reason="not implemented: Tool has no latest_return_time, lending_rules, or "
-        "notes-for-borrowers fields (app/models/tool.py, app/schemas/tool.py) -- there "
-        "is nothing to submit or assert on for this part of the scenario."
-    )
-    async def test_optional_lending_fields_stored_and_displayed(self) -> None:
-        raise NotImplementedError
 
 
 class TestScenario2RequiredFieldsMissing:
@@ -145,13 +140,8 @@ class TestScenario4ZeroPhotosIsRejected:
         assert response.status_code == 422
 
 
-class TestScenario5LatestReturnTimeFormatValidated:
-    @pytest.mark.skip(
-        reason="not implemented: no latest_return_time field exists on Tool "
-        "(app/models/tool.py) or ToolResponse/ToolUpdate (app/schemas/tool.py)."
-    )
-    async def test_invalid_time_format_rejected(self) -> None:
-        raise NotImplementedError
+# Scenario 5 (latest_return_time format validation) is descoped -- see
+# module docstring; no such field exists on Tool.
 
 
 class TestScenario6UnauthenticatedCannotCreateListing:

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import PaginationControls from '../components/PaginationControls';
@@ -23,7 +23,11 @@ function AdminListingsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [deactivationReason, setDeactivationReason] = useState<Record<string, string>>({});
+  // Guards against stale responses: when search/status/page changes quickly,
+  // an older in-flight request must not overwrite the newer results.
+  const fetchSeqRef = useRef(0);
   const fetchTools = useCallback(async () => {
+    const requestId = ++fetchSeqRef.current;
     setIsLoading(true);
     setError('');
     try {
@@ -34,14 +38,22 @@ function AdminListingsPage() {
         page_size: DEFAULT_PAGE_SIZE,
       });
 
+      if (requestId !== fetchSeqRef.current) {
+        return; // superseded by a newer request
+      }
       setTools(data.items);
       setTotal(data.total);
       setPageSize(data.page_size);
       setTotalPages(data.pages);
     } catch (err) {
+      if (requestId !== fetchSeqRef.current) {
+        return; // superseded by a newer request
+      }
       setError(err instanceof Error ? err.message : 'Failed to load tools');
     } finally {
-      setIsLoading(false);
+      if (requestId === fetchSeqRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [statusFilter, search, currentPage]);
   useEffect(() => {

@@ -6,6 +6,7 @@ from app.dependencies import (
     get_current_member_read_only,
     get_current_user,
     get_db,
+    security,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "get_current_member",
     "get_current_member_read_only",
     "get_current_admin_user",
+    "security",
 ]

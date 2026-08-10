@@ -1,9 +1,11 @@
 """Authentication and identity endpoints."""
 
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
@@ -12,7 +14,10 @@ from app.api.deps import (
     get_current_member_read_only,
     get_current_user,
     get_db,
+    security,
 )
+from app.core.exceptions import AuthenticationError
+from app.core.security import decode_token
 from app.dependencies_rate_limit import (
     rate_limit_forgot_password,
     rate_limit_login,
@@ -154,10 +159,16 @@ async def refresh(
 async def logout(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_member)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
 ) -> MessageResponse:
-    """Stateless logout hook."""
+    """Revoke the presented access token so it is rejected immediately."""
+    if credentials is None:
+        raise AuthenticationError("Authentication required")
+    payload = decode_token(credentials.credentials)
+    jti = payload["jti"]
+    expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
     service = AuthService()
-    await service.logout(db, current_user)
+    await service.logout(db, user=current_user, jti=jti, expires_at=expires_at)
     return MessageResponse(message="Logged out successfully")
 
 
