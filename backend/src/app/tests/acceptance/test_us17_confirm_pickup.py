@@ -68,17 +68,6 @@ class TestScenario2CannotMarkPickedUpBeforeStartDate:
         assert reservation.state == ReservationState.APPROVED
 
 
-class TestScenario3MarkAsPickedUpUIHiddenWhenRequested:
-    @pytest.mark.skip(
-        reason="not implemented (n/a to backend): whether the 'mark as picked up' "
-        "control is displayed for a REQUESTED reservation is a frontend rendering "
-        "concern, not an API behavior. Scenario 4 covers the equivalent backend "
-        "enforcement (rejecting the transition outright)."
-    )
-    async def test_control_not_displayed_for_requested(self) -> None:
-        raise NotImplementedError
-
-
 class TestScenario4BackendRejectsInvalidStatusTransition:
     async def test_rejected_from_requested(self, client, db_session: AsyncSession) -> None:
         owner, borrower, tool, reservation = await _make_reservation(

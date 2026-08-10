@@ -259,14 +259,3 @@ class TestScenario8EditOrDeleteWithin24Hours:
             headers=auth_header(owner.id),
         )
         assert response.status_code == 422
-
-
-class TestScenario9ReviewWindowReminderSentAfterThreeDays:
-    @pytest.mark.skip(
-        reason="not implemented: SchedulerService (app/services/scheduler.py) has "
-        "exactly three jobs (auto_cancel_overdue_pickups, "
-        "auto_escalate_overdue_returns, cleanup_expired_tokens) -- there is no "
-        "review-reminder job at all."
-    )
-    async def test_reminder_notification_sent_after_three_days(self) -> None:
-        raise NotImplementedError

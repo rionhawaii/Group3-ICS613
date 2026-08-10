@@ -290,14 +290,6 @@ class TestScenario6bDamageReportWindowClosesAfterSevenDays:
 
 
 class TestScenario7ToolNeverReturnedEscalationAfterSevenDays:
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: SchedulerService.auto_escalate_overdue_returns "
-        "(app/services/scheduler.py) notifies the BORROWER at the 7-day soft "
-        "cutoff, not the admin, and sets no admin-visible flag on the "
-        "borrower's profile -- the doc requires the admin be notified with a "
-        "profile flag, not the borrower notified directly.",
-    )
     async def test_admin_notified_and_borrower_profile_flagged(
         self, client, db_session: AsyncSession
     ) -> None:
@@ -321,13 +313,6 @@ class TestScenario7ToolNeverReturnedEscalationAfterSevenDays:
         )
         assert len(admin_notifications) >= 1
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: the doc requires the reservation stay PICKED_UP until "
-        "an admin resolves it, but auto_escalate_overdue_returns hard-resolves "
-        "(auto force-returns) anything past scheduler_hard_escalation_days "
-        "(default 14) with no admin involved at all.",
-    )
     async def test_reservation_remains_picked_up_indefinitely_until_admin_acts(
         self, client, db_session: AsyncSession
     ) -> None:

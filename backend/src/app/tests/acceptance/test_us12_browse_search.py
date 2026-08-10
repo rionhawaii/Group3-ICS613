@@ -32,15 +32,6 @@ class TestScenario1BrowseAllActiveTools:
         assert listing["avg_rating"] == 0.0
         assert listing["category"] == "GARDEN_TOOLS"
 
-    @pytest.mark.skip(
-        reason="not implemented: ToolResponse (app/schemas/tool.py) has no per-listing "
-        "'availability status' field (e.g. currently available vs out on loan) -- only "
-        "is_active exists, which reflects whether the LISTING is active, not whether the "
-        "tool is presently borrowed. Also no latest_return_time field exists (see US8)."
-    )
-    async def test_availability_status_and_latest_return_time_shown(self) -> None:
-        raise NotImplementedError
-
 
 class TestScenario2SearchByNameOrKeyword:
     async def test_search_matches_name_or_description(
@@ -63,14 +54,6 @@ class TestScenario2SearchByNameOrKeyword:
         )
         assert any(i["name"] == "Cordless Drill" for i in items)
         assert not any(i["name"] == "Lawn Mower" for i in items)
-
-    @pytest.mark.skip(
-        reason="not implemented: ToolService.list_tools (app/services/tool.py) orders "
-        "search results by created_at desc, not by textual relevance -- there is no "
-        "relevance/ranking scoring between a name match and a description match."
-    )
-    async def test_results_sorted_by_relevance(self) -> None:
-        raise NotImplementedError
 
 
 class TestScenario3FilterByCategory:

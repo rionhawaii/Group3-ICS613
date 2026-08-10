@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import ConflictError, NotFoundError, PermissionDeniedError
 from app.models.admin_audit_log import AdminAuditLog
-from app.models.enums import NotificationType, ReservationState, UserStatus
+from app.models.enums import CancellerType, NotificationType, ReservationState, UserStatus
 from app.models.reservation import Reservation
 from app.models.tool import Tool
 from app.models.user import User
@@ -131,6 +131,91 @@ class AdminService:
             body=f"Your account was suspended. Reason: {reason}",
             payload={"actor_id": str(admin.id)},
         )
+
+        # Local import: tool.py imports AdminService at module level, so a
+        # module-level import here would create a circular import.
+        from app.services.tool import ToolService
+
+        # Owner-side cascade: deactivate the suspended member's active tool
+        # listings, notifying any borrowers whose pending reservations get
+        # auto-cancelled as a result. Tools currently PICKED_UP are skipped
+        # (not force-returned) -- see FIX_PLAN_serious_issues.local.md FIX 2.
+        owned_tools = await db.execute(
+            select(Tool).where(
+                Tool.owner_id == target.id,
+                Tool.is_active.is_(True),
+                Tool.deleted_at.is_(None),
+            )
+        )
+        for tool in owned_tools.scalars().all():
+            affected = (
+                (
+                    await db.execute(
+                        select(Reservation).where(
+                            Reservation.tool_id == tool.id,
+                            Reservation.state.in_(
+                                [ReservationState.REQUESTED, ReservationState.APPROVED]
+                            ),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            try:
+                await ToolService().deactivate_tool(
+                    db,
+                    tool=tool,
+                    actor=admin,
+                    reason=f"Owner account suspended: {reason}",
+                )
+            except ConflictError:
+                continue
+
+            for r in affected:
+                await NotificationService().create(
+                    db,
+                    user_id=r.borrower_id,
+                    type_=NotificationType.RESERVATION_CANCELLED,
+                    title="Reservation cancelled",
+                    body="Your reservation was cancelled because the tool owner's "
+                    "account was suspended.",
+                    payload={"reservation_id": str(r.id), "reason": "owner_account_suspended"},
+                )
+
+        # Borrower-side cascade: cancel the suspended member's own pending
+        # reservations and notify the affected tool owners.
+        now = datetime.now(UTC)
+        borrower_reservations = (
+            (
+                await db.execute(
+                    select(Reservation).where(
+                        Reservation.borrower_id == target.id,
+                        Reservation.state.in_(
+                            [ReservationState.REQUESTED, ReservationState.APPROVED]
+                        ),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for r in borrower_reservations:
+            r.state = ReservationState.CANCELLED
+            r.cancelled_by_type = CancellerType.SYSTEM.value
+            r.cancelled_reason = f"Borrower account suspended: {reason}"
+            r.updated_at = now
+            db.add(r)
+
+            await NotificationService().create(
+                db,
+                user_id=r.tool.owner_id,
+                type_=NotificationType.RESERVATION_CANCELLED,
+                title="Reservation cancelled",
+                body="A reservation on your tool was cancelled because the "
+                "borrower's account was suspended.",
+                payload={"reservation_id": str(r.id), "reason": "borrower_account_suspended"},
+            )
 
         await db.flush()
         return target

@@ -1,14 +1,16 @@
 """User Story 30 — Admin Suspends a Member Account."""
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.admin_audit_log import AdminAuditLog
-from app.models.enums import UserStatus
+from app.models.enums import DeactivationActor, ReservationState, UserStatus
 from app.models.notification import Notification
 from app.tests.acceptance.helpers import auth_header, make_admin
-from app.tests.factories import UserFactory
+from app.tests.factories import ReservationFactory, ToolFactory, UserFactory
 
 pytestmark = pytest.mark.acceptance
 
@@ -144,40 +146,120 @@ class TestScenario5CannotSuspendAlreadySuspendedMember:
 
 
 class TestScenario6SuspendedMembersToolListingsAreAutoDeactivated:
-    @pytest.mark.skip(
-        reason="not implemented: AdminService.deactivate_user (app/services/admin.py) "
-        "only flips the User.status field and sends one notification -- it never "
-        "touches the suspended member's Tool rows at all, so their ACTIVE listings "
-        "stay ACTIVE after suspension. No cascade to tool listings exists. Unlike "
-        "most other documented gaps in this suite, this one previously had no "
-        "skip/xfail stub anywhere -- added here for QA test-case doc parity."
-    )
-    async def test_active_listings_auto_deactivated_inactive_listings_unchanged(self) -> None:
-        raise NotImplementedError
+    async def test_active_listings_auto_deactivated_inactive_listings_unchanged(
+        self, client, db_session: AsyncSession
+    ) -> None:
+        admin = await make_admin(db_session)
+        member = await UserFactory.create_async(db_session)
+
+        active_tool = await ToolFactory.create_async(db_session, owner_id=member.id, is_active=True)
+        already_inactive_tool = await ToolFactory.create_async(
+            db_session,
+            owner_id=member.id,
+            is_active=False,
+            deactivated_by=DeactivationActor.OWNER,
+            deactivated_at=datetime.now(UTC),
+            deactivation_reason="manual hold",
+        )
+
+        response = await client.post(
+            f"/api/v1/admin/users/{member.id}/deactivate",
+            json={"reason": "Repeated policy violations"},
+            headers=auth_header(admin.id),
+        )
+        assert response.status_code == 200
+
+        await db_session.refresh(active_tool)
+        await db_session.refresh(already_inactive_tool)
+        assert active_tool.is_active is False
+        assert already_inactive_tool.is_active is False
+        assert already_inactive_tool.deactivation_reason == "manual hold"
 
 
 class TestScenario7SuspendedMembersPendingReservationsAreAutoCancelled:
-    @pytest.mark.skip(
-        reason="not implemented: AdminService.deactivate_user (app/services/admin.py) "
-        "never touches Reservation rows -- REQUESTED/APPROVED reservations where the "
-        "suspended member is the borrower are left untouched, and affected owners "
-        "receive no cancellation notification. No cascade to reservations exists. "
-        "Previously had no skip/xfail stub; added here for QA test-case doc parity."
-    )
-    async def test_requested_and_approved_borrower_reservations_auto_cancelled(self) -> None:
-        raise NotImplementedError
+    async def test_requested_and_approved_borrower_reservations_auto_cancelled(
+        self, client, db_session: AsyncSession
+    ) -> None:
+        admin = await make_admin(db_session)
+        member = await UserFactory.create_async(db_session)
+        owner_one = await UserFactory.create_async(db_session)
+        owner_two = await UserFactory.create_async(db_session)
+        tool_one = await ToolFactory.create_async(db_session, owner_id=owner_one.id)
+        tool_two = await ToolFactory.create_async(db_session, owner_id=owner_two.id)
+
+        requested = await ReservationFactory.create_async(
+            db_session,
+            tool_id=tool_one.id,
+            borrower_id=member.id,
+            state=ReservationState.REQUESTED,
+        )
+        approved = await ReservationFactory.create_async(
+            db_session,
+            tool_id=tool_two.id,
+            borrower_id=member.id,
+            state=ReservationState.APPROVED,
+        )
+
+        response = await client.post(
+            f"/api/v1/admin/users/{member.id}/deactivate",
+            json={"reason": "Repeated policy violations"},
+            headers=auth_header(admin.id),
+        )
+        assert response.status_code == 200
+
+        await db_session.refresh(requested)
+        await db_session.refresh(approved)
+        assert requested.state == ReservationState.CANCELLED
+        assert approved.state == ReservationState.CANCELLED
+
+        for owner in (owner_one, owner_two):
+            notifications = (
+                (
+                    await db_session.execute(
+                        select(Notification).where(Notification.user_id == owner.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(notifications) >= 1
 
 
 class TestScenario8BorrowersWithReservationsOnSuspendedMembersToolsAreNotified:
-    @pytest.mark.skip(
-        reason="not implemented: same root cause as Scenario 7 -- AdminService."
-        "deactivate_user has no reservation-cascade logic at all, so a borrower "
-        "with an APPROVED reservation on a tool owned by a member who just got "
-        "suspended is never notified and the reservation is never cancelled. "
-        "Previously had no skip/xfail stub; added here for QA test-case doc parity."
-    )
-    async def test_borrower_on_suspended_owners_tool_is_notified_and_freed(self) -> None:
-        raise NotImplementedError
+    async def test_borrower_on_suspended_owners_tool_is_notified_and_freed(
+        self, client, db_session: AsyncSession
+    ) -> None:
+        admin = await make_admin(db_session)
+        member = await UserFactory.create_async(db_session)
+        borrower = await UserFactory.create_async(db_session)
+        tool = await ToolFactory.create_async(db_session, owner_id=member.id)
+        reservation = await ReservationFactory.create_async(
+            db_session,
+            tool_id=tool.id,
+            borrower_id=borrower.id,
+            state=ReservationState.APPROVED,
+        )
+
+        response = await client.post(
+            f"/api/v1/admin/users/{member.id}/deactivate",
+            json={"reason": "Repeated policy violations"},
+            headers=auth_header(admin.id),
+        )
+        assert response.status_code == 200
+
+        await db_session.refresh(reservation)
+        assert reservation.state == ReservationState.CANCELLED
+
+        notifications = (
+            (
+                await db_session.execute(
+                    select(Notification).where(Notification.user_id == borrower.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(notifications) >= 1
 
 
 class TestScenario9SuspendingNonexistentMemberReturns404:

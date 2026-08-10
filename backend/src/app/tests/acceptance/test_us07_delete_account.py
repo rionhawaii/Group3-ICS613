@@ -113,18 +113,6 @@ class TestScenario4DeletedAccountCannotLogIn:
         assert login_response.status_code == 401
 
 
-class TestScenario4ReRegistrationRequiresConfirmation:
-    @pytest.mark.skip(
-        reason="not implemented: there is no explicit 'acknowledge the previous account "
-        "is gone' confirmation step anywhere in the register flow. In practice, "
-        "soft-delete anonymizes the email (see Scenario 1), which frees the original "
-        "address for a brand-new invite+register with no special handling -- the doc's "
-        "required confirmation UX does not exist."
-    )
-    async def test_reregistration_requires_explicit_confirmation(self) -> None:
-        raise NotImplementedError
-
-
 class TestScenario6DeletingOwnerCascadesToTheirListingsAndReservations:
     """Self-deletion is blocked outright if the member has an active
     reservation as borrower or a currently-PICKED_UP tool (Scenario 2), but
