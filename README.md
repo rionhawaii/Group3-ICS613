@@ -113,7 +113,7 @@ The application handles authentication (JWT), background scheduling (APScheduler
 | **Database** | PostgreSQL 15 |
 |  | Docker Container (for PostgreSQL) |
 | **Environment / Secrets** | `.env` file (for DB passwords, API keys) | python-dotenv (loads `.env` into the app) |
-| **Testing** | pytest | `src/app/tests/` (380 tests: 283 acceptance + 97 auxiliary) |
+| **Testing** | pytest | `src/app/tests/` (384 tests: 273 acceptance + 111 auxiliary) |
 | | pytest-asyncio | Async test support |
 | | httpx | ASGI test client |
 | **Code Quality** | ruff | Linting and import sorting |
@@ -318,7 +318,7 @@ cd frontend
 ```bash
 cd backend
 source venv/bin/activate
-pytest src/app/tests/ -q          # all 380 tests
+pytest src/app/tests/ -q          # all 384 tests
 pytest src/app/tests/ -v          # verbose output
 pytest src/app/tests/test_auth.py -v   # single file
 ```

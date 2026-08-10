@@ -48,6 +48,17 @@ export const authApi = {
   updateMe: (data: UserUpdate) =>
     apiRequest<UserProfile>('PUT', '/auth/me', data),
 
+  uploadProfilePhoto: (file: File) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    return apiRequest<UserProfile>(
+      'POST',
+      '/auth/me/photo',
+      formData,
+      { isFormData: true },
+    );
+  },
+
   deleteMe: () => apiRequest<void>('DELETE', '/auth/me'),
 
   forgotPassword: (data: ForgotPasswordRequest) =>

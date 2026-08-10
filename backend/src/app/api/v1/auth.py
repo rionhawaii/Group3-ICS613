@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -199,6 +199,23 @@ async def update_me(
         updates=request_data.model_dump(exclude_unset=True),
     )
     return UserProfile.model_validate(updated_user)
+
+
+@router.post("/me/photo", response_model=UserProfile)
+async def upload_profile_photo(
+    photo: Annotated[UploadFile, File()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_member)],
+) -> UserProfile:
+    """Upload a profile photo (multipart form field ``photo``).
+
+    Accepted types: JPEG, PNG, WebP up to the configured size limit
+    (5 MB by default). Returns the updated profile with ``photo_url`` set
+    to the saved file under ``/uploads/``, replacing any previous photo.
+    """
+    service = AuthService()
+    user = await service.upload_profile_photo(db, current_user, file=photo)
+    return UserProfile.model_validate(user)
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
