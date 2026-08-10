@@ -453,6 +453,7 @@ class AdminService:
         self,
         db: AsyncSession,
         *,
+        actor_id: uuid.UUID | None = None,
         action_type: str | None = None,
         target_type: str | None = None,
         target_id: uuid.UUID | None = None,
@@ -463,12 +464,16 @@ class AdminService:
     ) -> tuple[list[AdminAuditLog], int]:
         """Query the admin audit log with optional filters (US32).
 
-        Supports filtering by action_type, target_type, target_id, and
-        a date range (date_from / date_to, inclusive on date_to).
+        Supports filtering by actor_id (which admin performed the action),
+        action_type, target_type, target_id, and a date range (date_from /
+        date_to, inclusive on date_to).
         """
         query = select(AdminAuditLog)
         count_q = select(func.count(AdminAuditLog.id))
 
+        if actor_id is not None:
+            query = query.where(AdminAuditLog.actor_id == actor_id)
+            count_q = count_q.where(AdminAuditLog.actor_id == actor_id)
         if action_type:
             query = query.where(AdminAuditLog.action_type == action_type)
             count_q = count_q.where(AdminAuditLog.action_type == action_type)

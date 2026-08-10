@@ -87,12 +87,6 @@ class TestScenario1AutoCancelledAfterGracePeriod:
         )
         assert new_request.status_code == 201
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: the doc requires BOTH borrower and owner be notified of "
-        "the auto-cancellation, but SchedulerService.auto_cancel_overdue_pickups "
-        "(app/services/scheduler.py) only calls NotificationService for the borrower.",
-    )
     async def test_owner_is_also_notified(self, client, db_session: AsyncSession) -> None:
         from sqlalchemy import select
 

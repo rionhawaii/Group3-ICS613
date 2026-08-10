@@ -99,13 +99,6 @@ class TestScenario2AdminFiltersModerationHistory:
         assert by_date.status_code == 200
         assert by_date.json()["items"] == []
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: GET /admin/audit-log (app/api/v1/admin.py) has no "
-        "actor_id/admin query param -- target_id (member/listing) and "
-        "date-range filters exist, but filtering by which admin performed "
-        "the action is still missing.",
-    )
     async def test_filterable_by_acting_admin(self, client, db_session: AsyncSession) -> None:
         admin_one = await make_admin(db_session)
         admin_two = await make_admin(db_session)

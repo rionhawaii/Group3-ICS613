@@ -127,6 +127,20 @@ class SchedulerService:
                     ),
                     payload={"reservation_id": str(res.id)},
                 )
+
+                # Notify owner
+                await NotificationService().create(
+                    db,
+                    user_id=res.tool.owner_id,
+                    type_=NotificationType.RESERVATION_CANCELLED,
+                    title="Reservation auto-cancelled",
+                    body=(
+                        f"Your listing ({res.tool.name}) had a reservation "
+                        f"automatically cancelled because it was not picked up by "
+                        f"{res.start_date}."
+                    ),
+                    payload={"reservation_id": str(res.id)},
+                )
             if overdue:
                 logger.info("Auto-cancelled %d overdue pickups", len(overdue))
 

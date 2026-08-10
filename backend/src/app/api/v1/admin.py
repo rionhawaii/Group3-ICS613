@@ -188,6 +188,9 @@ async def get_user_moderation_profile(
 async def list_audit_log(
     db: Annotated[AsyncSession, Depends(get_db)],
     _admin: Annotated[User, Depends(get_current_admin_user)],
+    actor_id: Annotated[
+        uuid.UUID | None, Query(description="Filter by which admin performed the action")
+    ] = None,
     action_type: Annotated[str | None, Query()] = None,
     target_type: Annotated[str | None, Query()] = None,
     target_id: Annotated[uuid.UUID | None, Query()] = None,
@@ -202,14 +205,15 @@ async def list_audit_log(
 ) -> PaginatedResponse[AuditLogResponse]:
     """Admin-only: query the moderation history / audit log (US32).
 
-    Supports filtering by action_type, target_type, target_id, and a
-    date range. Paginated 50/page default.
+    Supports filtering by actor_id (acting admin), action_type,
+    target_type, target_id, and a date range. Paginated 50/page default.
     """
     parsed_from = _parse_iso_datetime(date_from)
     parsed_to = _parse_iso_datetime(date_to, end_of_day=True)
 
     entries, total = await AdminService().list_audit_log(
         db,
+        actor_id=actor_id,
         action_type=action_type,
         target_type=target_type,
         target_id=target_id,

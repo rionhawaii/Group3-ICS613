@@ -88,12 +88,6 @@ class TestScenario3DeactivatingWithPendingReservationsAutoCancels:
         await db_session.refresh(reservation)
         assert reservation.state == ReservationState.CANCELLED
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: ToolService.deactivate_tool (app/services/tool.py) auto-"
-        "cancels REQUESTED/APPROVED reservations but never calls NotificationService "
-        "-- affected borrowers receive no in-app notification of the cancellation.",
-    )
     async def test_affected_borrower_is_notified(self, client, db_session: AsyncSession) -> None:
         owner = await UserFactory.create_async(db_session)
         borrower = await UserFactory.create_async(db_session)
@@ -160,12 +154,6 @@ class TestScenario4AdminCanReactivateDeactivatedListing:
         )
         assert len(audit_rows) >= 1
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: ToolService.reactivate_tool (app/services/tool.py) never "
-        "calls NotificationService -- the listing owner receives no notification that "
-        "their listing was reactivated.",
-    )
     async def test_owner_is_notified_of_reactivation(
         self, client, db_session: AsyncSession
     ) -> None:
@@ -216,8 +204,8 @@ class TestScenario5DeactivationLoggedWithAdminIdTimestampReason:
         self, client, db_session: AsyncSession
     ) -> None:
         """GET /admin/audit-log supports target_id (listing) and date-range
-        filters; filtering by the acting admin is still missing (see
-        test_audit_log_filterable_by_acting_admin below)."""
+        filters; filtering by the acting admin is covered separately in
+        test_audit_log_filterable_by_acting_admin below."""
         owner = await UserFactory.create_async(db_session)
         admin = await make_admin(db_session)
         tool_a = await create_tool(client, owner, name="Tool A")
@@ -253,13 +241,6 @@ class TestScenario5DeactivationLoggedWithAdminIdTimestampReason:
         assert by_date.status_code == 200
         assert by_date.json()["items"] == []
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: GET /api/v1/admin/audit-log (app/api/v1/admin.py) has "
-        "no actor_id/admin query param -- target_id (listing) and date-range "
-        "filters exist, but filtering by which admin performed the action is "
-        "still missing.",
-    )
     async def test_audit_log_filterable_by_acting_admin(
         self, client, db_session: AsyncSession
     ) -> None:

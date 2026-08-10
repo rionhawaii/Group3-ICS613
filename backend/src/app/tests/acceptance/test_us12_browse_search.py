@@ -160,13 +160,9 @@ class TestScenario5ViewDetailedInformation:
         assert data["owner"]["id"] == str(owner.id)
         assert data["avg_rating"] == 0.0
 
-    @pytest.mark.skip(
-        reason="not implemented: no latest_return_time / lending_rules / notes-for-"
-        "borrowers fields exist (see US8), and there is no 'upcoming availability "
-        "calendar' endpoint or field -- ToolResponse exposes no reservation dates at all."
-    )
-    async def test_lending_rules_return_time_and_availability_calendar_shown(self) -> None:
-        raise NotImplementedError
+
+# Scenario "lending rules, return time, and availability calendar shown" is
+# descoped -- see US8 module docstring; no such fields/endpoint exist.
 
 
 class TestScenario6SearchYieldsZeroMatchingResults:

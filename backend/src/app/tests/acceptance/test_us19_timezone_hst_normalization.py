@@ -22,9 +22,11 @@ right answer regardless of server timezone, purely because there's no
 time-of-day to get wrong -- but the doc's explicit requirement (store in UTC,
 display in HST, evaluate "today" in HST) is not implemented as a deliberate
 behavior in the request path; it's an accident of using date-only columns.
-The two scenarios below that depend on real HST time-of-day handling in that
-path (request-time conversion, locale-independent date display) are still
-gaps.
+Two scenarios depended on real HST time-of-day handling in that path
+(request-time conversion, locale-independent date display); the team
+decided the scheduler-side HST work above is sufficient and the
+request-path piece is out of scope (see QA_NOTES.local.md, 2026-08-09
+triage). Those scenarios have been removed rather than left skipped.
 """
 
 from datetime import date, timedelta
@@ -38,14 +40,8 @@ from app.tests.factories import UserFactory
 pytestmark = pytest.mark.acceptance
 
 
-class TestScenario1AllSubmittedDatesNormalizedToHSTOnServer:
-    @pytest.mark.skip(
-        reason="not implemented: there is no HST conversion step anywhere in the "
-        "request path (see module docstring) -- dates are stored and compared as "
-        "plain calendar dates with no timezone tagging at all."
-    )
-    async def test_dates_converted_hst_to_utc_and_back(self) -> None:
-        raise NotImplementedError
+# Scenario 1 (dates converted HST-to-UTC-and-back on the request path) is
+# descoped -- see module docstring.
 
 
 class TestScenario2ReservationWindowSpansFullDayInHST:
@@ -159,13 +155,5 @@ class TestScenario5OneDayRentalHandledCorrectly:
         assert response.status_code == 201
 
 
-class TestScenario6DateInputAssumedHSTRegardlessOfBrowserLocale:
-    @pytest.mark.skip(
-        reason="not implemented: since dates are submitted and stored as plain "
-        "ISO calendar dates (YYYY-MM-DD) with no timezone component, there is no "
-        "conversion to get wrong for the date *portion* -- but there is also no "
-        "explicit 'these are HST dates' contract or UI note; it's untested/"
-        "unspecified behavior rather than a deliberate HST guarantee."
-    )
-    async def test_date_only_input_has_no_locale_dependent_conversion(self) -> None:
-        raise NotImplementedError
+# Scenario 6 (locale-independent date-only input) is descoped -- see
+# module docstring.

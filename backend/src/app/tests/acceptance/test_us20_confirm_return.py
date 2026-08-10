@@ -2,11 +2,13 @@
 
 Structural note: `Reservation` has no `is_late`/`late_return` field at all
 (app/models/reservation.py), and `latest_return_time` doesn't exist on `Tool`
-(see US8). `ReservationService.mark_returned` never compares the return
-moment against `end_date` or any deadline -- it unconditionally transitions
-to RETURNED. So every "late return" scenario in the doc (warnings,
-confirmation prompts, late-flagging, distinct owner notification of
-lateness) is a gap, not a partial implementation.
+(see US8 -- descoped for the same reason). `ReservationService.mark_returned`
+never compares the return moment against `end_date` or any deadline -- it
+unconditionally transitions to RETURNED. The team decided the "late return"
+scenarios in the doc (warnings, confirmation prompts, late-flagging, distinct
+owner notification of lateness) are out of scope for this project rather
+than a fix worth making (see QA_NOTES.local.md, 2026-08-09 triage); those
+scenarios have been removed rather than left skipped/xfailed.
 """
 
 from datetime import UTC, date, datetime, timedelta
@@ -64,43 +66,10 @@ class TestScenario1BorrowerMarksReturnedOnTime:
         # the state transition itself (see User Story 24 for review submission).
 
 
-class TestScenario2LateReturnAfterLatestReturnTime:
-    @pytest.mark.skip(
-        reason="not implemented: no latest_return_time field exists on Tool at all "
-        "(see US8), so there is nothing to compare the return moment against, and "
-        "no confirmation-prompt flow for a late return exists."
-    )
-    async def test_late_return_prompts_confirmation_and_flags_record(self) -> None:
-        raise NotImplementedError
-
-
-class TestScenario3ReturnAfterEndDate:
-    @pytest.mark.xfail(
-        strict=True,
-        reason="known gap: ReservationService.mark_returned (app/services/"
-        "reservation.py) never checks the current date against end_date -- "
-        "returning after end_date transitions to RETURNED exactly like an "
-        "on-time return, with no late-return flag set anywhere (no such field "
-        "exists on Reservation) and no distinct 'late' notification to the owner.",
-    )
-    async def test_late_return_is_flagged_and_owner_notified_of_lateness(
-        self, client, db_session: AsyncSession
-    ) -> None:
-        owner, borrower, tool, reservation = await _make_picked_up_reservation(
-            client,
-            db_session,
-            start_date=date.today() - timedelta(days=10),
-            end_date=date.today() - timedelta(days=1),
-        )
-
-        response = await client.post(
-            f"/api/v1/reservations/{reservation.id}/mark-returned",
-            headers=auth_header(borrower.id),
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data.get("is_late") is True
+# Scenarios 2 and 3 (late-return confirmation prompt, late-return flag +
+# distinct lateness notification) are descoped -- see module docstring.
+# A late `mark-returned` still succeeds and transitions to RETURNED exactly
+# like an on-time return; that path is covered by Scenario 1.
 
 
 class TestScenario4NonBorrowerCannotMarkReturned:
