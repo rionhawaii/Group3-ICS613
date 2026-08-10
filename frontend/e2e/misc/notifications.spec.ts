@@ -35,15 +35,30 @@ test.describe.serial('NotificationsPage', () => {
   test('filters to unread and read notifications', async ({ page }) => {
     await loginAsMockUser(page, '/notifications');
 
-    await page.getByRole('button', { name: 'Unread (2)' }).click();
-    await expect(page.locator('.notification-card')).toHaveCount(2);
+    // Counts are relative to whatever admin/misc specs ran before this file
+    // (e.g. admin-listings deactivation/reactivation now notifies the owner),
+    // so read the live counts instead of hardcoding the seed fixture values.
+    const data = await apiGet<{ total: number; unread_count: number }>(
+      page,
+      '/api/v1/notifications?page_size=20',
+    );
+    const unread = data.unread_count;
+    const read = data.total - data.unread_count;
 
-    await page.getByRole('button', { name: 'Read (1)' }).click();
-    await expect(page.locator('.notification-card')).toHaveCount(1);
+    await page.getByRole('button', { name: `Unread (${unread})` }).click();
+    await expect(page.locator('.notification-card')).toHaveCount(unread);
+
+    await page.getByRole('button', { name: `Read (${read})` }).click();
+    await expect(page.locator('.notification-card')).toHaveCount(read);
   });
 
   test('marks a single notification as read and updates counts', async ({ page }) => {
     await loginAsMockUser(page, '/notifications');
+
+    const before = await apiGet<{ unread_count: number }>(
+      page,
+      '/api/v1/notifications?page_size=20',
+    );
 
     await page
       .locator('.notification-card-unread')
@@ -54,15 +69,23 @@ test.describe.serial('NotificationsPage', () => {
     await expect(page.getByText('Notification marked as read.')).toBeVisible();
     await expect(
       page.locator('.notification-summary-grid .summary-card').nth(1).locator('.summary-number'),
-    ).toHaveText('1');
+    ).toHaveText(String(before.unread_count - 1));
   });
 
   test('marks all remaining notifications as read and syncs the nav badge and dashboard', async ({
     page,
   }) => {
-    // One unread notification remains from the previous test.
+    // One fewer unread notification remains after the previous test marked
+    // a single notification as read.
     await loginAsMockUser(page, '/notifications');
-    await expect(page.locator('.nav-notification-badge')).toHaveText('1');
+
+    const remaining = await apiGet<{ unread_count: number }>(
+      page,
+      '/api/v1/notifications?page_size=20',
+    );
+    await expect(page.locator('.nav-notification-badge')).toHaveText(
+      String(remaining.unread_count),
+    );
 
     await page.getByRole('button', { name: 'Mark All as Read' }).click();
 

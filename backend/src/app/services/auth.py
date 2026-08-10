@@ -336,9 +336,7 @@ class AuthService:
             "token_type": "bearer",
         }
 
-    async def logout(
-        self, db: AsyncSession, *, user: User, jti: str, expires_at: datetime
-    ) -> None:
+    async def logout(self, db: AsyncSession, *, user: User, jti: str, expires_at: datetime) -> None:
         """Revoke the presented access token by recording its ``jti``.
 
         Adds the token to the ``revoked_tokens`` deny-list so

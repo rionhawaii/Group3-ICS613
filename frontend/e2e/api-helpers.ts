@@ -132,7 +132,7 @@ export async function createTestTool(
   return response.json();
 }
 
-async function loginForToken(page: Page, email: string, password = 'devpass123'): Promise<string> {
+async function loginForToken(page: Page, email: string, password = 'devpass123'): Promise<string> { // pragma: allowlist secret -- dev-only seed password, not a real credential
   const response = await page.request.post('/api/v1/auth/login', { data: { email, password } });
   if (!response.ok()) {
     throw new Error(`login failed for ${email}: ${response.status()} ${await response.text()}`);

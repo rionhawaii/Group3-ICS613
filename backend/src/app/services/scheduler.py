@@ -260,9 +260,7 @@ class SchedulerService:
                                     "admin-force-return where appropriate."
                                 ),
                                 payload={
-                                    "reservation_ids": [
-                                        str(r.id) for r in overdue_needing_admin
-                                    ]
+                                    "reservation_ids": [str(r.id) for r in overdue_needing_admin]
                                 },
                             )
 
