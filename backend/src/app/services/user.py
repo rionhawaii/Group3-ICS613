@@ -257,20 +257,20 @@ class UserService:
         *,
         file: UploadFile,
     ) -> User:
-        """Validate and persist an uploaded profile photo, replacing the previous one.
+        """Validate and persist an uploaded profile photo, replacing the previous URL.
 
         Reuses the tool-photo pipeline (magic-byte + size validation, async
-        disk write served from ``/uploads``). The previous photo file is
-        removed when it was itself an uploaded file; external URL strings
-        set via ``PUT /auth/me`` are left untouched.
+        disk write served from ``/uploads``). The previous photo FILE is
+        intentionally left on disk: ``photo_url`` can be set to any string
+        via ``PUT /auth/me`` (including another listing's ``/uploads/<file>``
+        path), so deleting by URL could remove a file the user does not own.
+        Old files are harmless orphans in the gitignored media directory.
         """
         content = await file.read()
         content_type = file.content_type
         PhotoStorageService.validate_image(content_type, len(content), content=content)
 
         url = await self.photo_storage.save(content, content_type or "image/jpeg")
-        if user.photo_url:
-            self.photo_storage.delete(user.photo_url)
 
         user.photo_url = url
         user.updated_at = datetime.now(UTC)

@@ -38,6 +38,7 @@ interface CachedProfile {
   displayName?: string;
   bio?: string;
   neighborhood?: string;
+  photoUrl?: string | null;
   photoFileName?: string;
   profileSetupComplete?: boolean;
 }

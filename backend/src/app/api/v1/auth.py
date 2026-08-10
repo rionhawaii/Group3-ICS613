@@ -209,7 +209,7 @@ async def upload_profile_photo(
 ) -> UserProfile:
     """Upload a profile photo (multipart form field ``photo``).
 
-    Accepted types: JPEG, PNG, WebP, GIF up to the configured size limit
+    Accepted types: JPEG, PNG, WebP up to the configured size limit
     (5 MB by default). Returns the updated profile with ``photo_url`` set
     to the saved file under ``/uploads/``, replacing any previous photo.
     """
