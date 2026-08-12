@@ -13,6 +13,8 @@ def validate_full_name(v: str | None) -> str | None:
         stripped = v.strip()
         if not stripped:
             raise ValueError("Display name cannot be empty or whitespace-only")
+        if len(stripped) > 40:
+            raise ValueError("Display name must be 40 characters or fewer")
         return stripped
     return v
 

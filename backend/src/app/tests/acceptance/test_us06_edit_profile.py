@@ -47,16 +47,29 @@ class TestScenario2DisplayNameCannotBeCleared:
 
 class TestScenario3DisplayNameExceedsMaxLength:
     async def test_overlong_display_name_rejected(self, client, db_session: AsyncSession) -> None:
-        # UserUpdate.full_name (app/schemas/user.py) enforces max_length=255.
+        # Server enforces the 40-character limit (frontend uses the same rule) —
+        # previously only max_length=255 was enforced server-side (finding in #339).
         user = await UserFactory.create_async(db_session)
 
         response = await client.put(
             "/api/v1/auth/me",
-            json={"full_name": "x" * 256},
+            json={"full_name": "x" * 41},
             headers=auth_header(user.id),
         )
 
         assert response.status_code == 422
+
+    async def test_exactly_40_characters_accepted(self, client, db_session: AsyncSession) -> None:
+        user = await UserFactory.create_async(db_session, full_name="Old Name")
+
+        response = await client.put(
+            "/api/v1/auth/me",
+            json={"full_name": "x" * 40},
+            headers=auth_header(user.id),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["full_name"] == "x" * 40
 
 
 class TestScenario4ProfilePhotoUploadFailsValidation:

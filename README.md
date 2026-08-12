@@ -49,7 +49,7 @@ We will use an Agile workflow. Each member posts on Discord every Monday about w
 
 ## Task management
 
-Our team will use GitHub issues and the board to manage tasks. 
+Our team uses GitHub issues and the [project board (backlog)](https://github.com/orgs/ICS613-Group3/projects/1) to manage tasks. All 35 user stories are tracked on the board with statuses: Backlog, Ready, In progress, In review, Done.
 
 Each assignee will change the task status when they start and when they complete it.
 
@@ -120,10 +120,7 @@ The application handles authentication (JWT), background scheduling (APScheduler
 | **Version Control** | GitHub (branching, pull requests, code review) |
 | **IDE** | VS Code or PyCharm |
 
-*Will be modified later as needed after all use cases and user stories are composed.*
 
-
-​
 # 5. Project Structure
 
 ```
@@ -178,8 +175,6 @@ The application handles authentication (JWT), background scheduling (APScheduler
 │   └── images/                   # Architecture and domain model diagrams
 └── README.md
 ```
-
-*Will be modified later as needed after all use cases and user stories are composed.*
 
 
 
@@ -242,7 +237,8 @@ python run.py --reload
 ```bash
 # 11. Set up the frontend (open in a new terminal from repo root)
 cd frontend
-# Flag for additional documentation on npm install and start commands
+npm install
+npm run dev
 ```
 
 For full detail on each step — including Windows-specific commands, troubleshooting, and seed user credentials — see [`backend/Backend_Setup.md`](backend/Backend_Setup.md).
@@ -298,7 +294,8 @@ python run.py --reload
 ### Frontend
 ```bash
 cd frontend
-# Flag for additional documentation to start command (e.g. npm run dev)
+npm install        # first time only
+npm run dev
 ```
 - App: `http://localhost:5173`
 
@@ -376,6 +373,3 @@ REQUESTED → APPROVED → PICKED_UP → RETURNED
          ↘ DENIED (terminal)
 REQUESTED or APPROVED → CANCELLED (terminal)
 ```
-
----
-The README will be updated as the project progresses.

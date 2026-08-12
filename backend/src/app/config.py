@@ -130,6 +130,11 @@ class Settings(BaseSettings):
         default="noreply@example.com",
         description="Sender address for outgoing emails (env: SMTP_FROM).",
     )
+    smtp_reply_to: str = Field(
+        default="noreply@example.com",
+        description="Reply-To address for outgoing emails — a dead address so "
+        "replies do not reach a real inbox (env: SMTP_REPLY_TO).",
+    )
 
     # Scheduler
     disable_scheduler: bool = Field(
