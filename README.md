@@ -120,10 +120,7 @@ The application handles authentication (JWT), background scheduling (APScheduler
 | **Version Control** | GitHub (branching, pull requests, code review) |
 | **IDE** | VS Code or PyCharm |
 
-*Will be modified later as needed after all use cases and user stories are composed.*
 
-
-​
 # 5. Project Structure
 
 ```
@@ -178,8 +175,6 @@ The application handles authentication (JWT), background scheduling (APScheduler
 │   └── images/                   # Architecture and domain model diagrams
 └── README.md
 ```
-
-*Will be modified later as needed after all use cases and user stories are composed.*
 
 
 
@@ -242,7 +237,8 @@ python run.py --reload
 ```bash
 # 11. Set up the frontend (open in a new terminal from repo root)
 cd frontend
-# Flag for additional documentation on npm install and start commands
+npm install
+npm run dev
 ```
 
 For full detail on each step — including Windows-specific commands, troubleshooting, and seed user credentials — see [`backend/Backend_Setup.md`](backend/Backend_Setup.md).
@@ -298,7 +294,8 @@ python run.py --reload
 ### Frontend
 ```bash
 cd frontend
-# Flag for additional documentation to start command (e.g. npm run dev)
+npm install        # first time only
+npm run dev
 ```
 - App: `http://localhost:5173`
 
@@ -376,6 +373,3 @@ REQUESTED → APPROVED → PICKED_UP → RETURNED
          ↘ DENIED (terminal)
 REQUESTED or APPROVED → CANCELLED (terminal)
 ```
-
----
-The README will be updated as the project progresses.

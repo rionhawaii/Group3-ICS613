@@ -173,6 +173,11 @@ function AccountDeletionPage() {
               placeholder="DELETE"
               disabled={hasActiveReservations}
             />
+            {hasActiveReservations && (
+              <span className="field-disabled-hint">
+                Disabled — you have active reservations. Cancel or complete them first.
+              </span>
+            )}
           </label>
 
           <label className="checkbox-row" htmlFor="understand-deletion">
@@ -185,6 +190,11 @@ function AccountDeletionPage() {
             />
             I understand this action cannot be undone.
           </label>
+          {hasActiveReservations && (
+            <span className="field-disabled-hint">
+              Disabled — you have active reservations. Cancel or complete them first.
+            </span>
+          )}
 
           <button
             className="danger-action-button"

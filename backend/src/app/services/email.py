@@ -28,6 +28,7 @@ class _MailHogBackend:
         port = settings.smtp_port or 1025
         msg = EmailMessage()
         msg["From"] = settings.smtp_from or "dev@example.com"
+        msg["Reply-To"] = settings.smtp_reply_to
         msg["To"] = to_email
         msg["Subject"] = subject
         msg.set_content(body)
@@ -50,6 +51,7 @@ class _SMTPBackend:
 
         msg = EmailMessage()
         msg["From"] = settings.smtp_from or settings.smtp_user
+        msg["Reply-To"] = settings.smtp_reply_to
         msg["To"] = to_email
         msg["Subject"] = subject
         msg.set_content(body)
