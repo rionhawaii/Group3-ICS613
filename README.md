@@ -49,7 +49,7 @@ We will use an Agile workflow. Each member posts on Discord every Monday about w
 
 ## Task management
 
-Our team will use GitHub issues and the board to manage tasks. 
+Our team uses GitHub issues and the [project board (backlog)](https://github.com/orgs/ICS613-Group3/projects/1) to manage tasks. All 35 user stories are tracked on the board with statuses: Backlog, Ready, In progress, In review, Done.
 
 Each assignee will change the task status when they start and when they complete it.
 
