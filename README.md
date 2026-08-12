@@ -112,11 +112,16 @@ The application handles authentication (JWT), background scheduling (APScheduler
 | **Database** | PostgreSQL 15 |
 |  | Docker Container (for PostgreSQL) |
 | **Environment / Secrets** | `.env` file (for DB passwords, API keys) | python-dotenv (loads `.env` into the app) |
-| **Testing** | pytest | `src/app/tests/` (384 tests: 273 acceptance + 111 auxiliary) |
+| **Testing** | pytest | `backend/src/app/tests/` (385 tests: 274 acceptance + 111 auxiliary, ~92% line coverage) |
 | | pytest-asyncio | Async test support |
+| | pytest-cov | Coverage reporting (term/xml/html) |
 | | httpx | ASGI test client |
+| | Playwright | `frontend/e2e/` (121 browser E2E tests across 25 spec files) |
 | **Code Quality** | ruff | Linting and import sorting |
 | | mypy | Static type checking |
+| | bandit | Backend SAST |
+| | semgrep | Frontend SAST (React/TS/OWASP Top 10 rulesets) |
+| | detect-secrets | Pre-commit secret scanning |
 | **Version Control** | GitHub (branching, pull requests, code review) |
 | **IDE** | VS Code or PyCharm |
 
@@ -311,23 +316,60 @@ npm run dev
 
 ## 9. Running Tests
 
+### Backend (pytest)
+
 ```bash
 cd backend
 source venv/bin/activate
-pytest src/app/tests/ -q          # all 384 tests
-pytest src/app/tests/ -v          # verbose output
-pytest src/app/tests/test_auth.py -v   # single file
+pytest src/app/tests/ -q                                    # all 385 tests
+pytest src/app/tests/ -v                                    # verbose output
+pytest src/app/tests/acceptance/test_us01_register.py -v    # single file
+pytest src/app/tests/ --cov=app --cov-report=term-missing   # with coverage
 ```
 
 > `pyproject.toml` configures `pythonpath = ["src"]` for pytest — no environment variables needed.
+
+The suite is split into two directories:
+
+| Directory | Count | Maps to |
+|-----------|-------|---------|
+| `src/app/tests/acceptance/` | 274 tests | One file per user story (`test_us##_*.py`), scenario-based, traceable to acceptance criteria |
+| `src/app/tests/auxiliary/` | 111 tests | Supplementary coverage (edge cases, security, exception routing) with no direct user-story mapping |
+
+Current backend line coverage is **~92%** (`app/` package, tests excluded). CI publishes the full `term-missing` breakdown and an HTML report as build artifacts on every run.
+
+### Frontend E2E (Playwright)
+
+```bash
+cd frontend
+npm run test:e2e              # full suite against a real backend + Postgres
+npx playwright test --list    # list tests without running them
+npx playwright show-report    # view the last HTML report
+```
+
+121 browser tests across 25 spec files under `frontend/e2e/`, organized by feature area (`auth/`, `tools/`, `reservations/`, `account/`, `admin/`, `misc/`) plus one isolated regression spec (`issue-141/`, run separately via `playwright.issue141.config.ts`). These drive the real Vite dev server and a live FastAPI backend — not mocks — so `LoginPage` and other flows exercise the actual `/api/v1` endpoints.
+
+### CI pipeline
+
+Every push and PR to `main` runs, via [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+| Job | What it checks |
+|-----|-----------------|
+| Backend tests | Full pytest suite (unit + acceptance) with coverage against a real Postgres service container |
+| Backend lint | `ruff check`, `ruff format --check`, `mypy`, `bandit` (SAST) |
+| Frontend checks | `eslint`, `tsc -b`, production build |
+| Frontend E2E | Full Playwright suite against a live backend + seeded Postgres |
+| Frontend E2E (issue #141/#197) | Isolated regression spec, mocked API, run separately from the main E2E job |
+| Secrets scan | `detect-secrets` via pre-commit, run against all tracked files |
+| Frontend SAST | `semgrep` (React/TypeScript/OWASP Top Ten rulesets) against `frontend/src` |
 
 ### Test coverage by owner
 
 | Test Type | Owner | Where It Lives |
 |-----------|-------|----------------|
-| Unit / integration (automated) | Backend lead | `src/app/tests/` (pytest) |
+| Unit / integration (automated) | Backend lead | `backend/src/app/tests/` (pytest, 385 tests, ~92% coverage) |
 | Manual acceptance test cases | QA lead | Separate document (at least one case per user story scenario) |
-| E2E browser automation | QA lead | Playwright or similar — future work |
+| E2E browser automation | QA lead | `frontend/e2e/` (Playwright, 121 tests) |
 
 
 
