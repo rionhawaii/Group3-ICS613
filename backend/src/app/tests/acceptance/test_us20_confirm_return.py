@@ -262,11 +262,17 @@ class TestScenario7ToolNeverReturnedEscalationAfterSevenDays:
     async def test_admin_notified_and_borrower_profile_flagged(
         self, client, db_session: AsyncSession
     ) -> None:
+        # end_date margin past the 7-day soft-escalation threshold must be
+        # wide enough to survive the scheduler's HST-vs-UTC date skew: the
+        # scheduler's cutoff is computed via utc_to_hst(...).date(), which
+        # trails the naive UTC date.today() used here by up to a day between
+        # 00:00-09:59 UTC. A 1-day margin (e.g. -8 days) can land exactly on
+        # the boundary and flake; 3+ days of margin is safe.
         owner, borrower, tool, reservation = await _make_picked_up_reservation(
             client,
             db_session,
             start_date=date.today() - timedelta(days=20),
-            end_date=date.today() - timedelta(days=8),
+            end_date=date.today() - timedelta(days=10),
         )
         admin = await UserFactory.create_async(db_session, is_admin=True)
 
