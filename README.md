@@ -21,6 +21,7 @@ Neighborhood Tool Sharing
 9. [Running Tests](#9-running-tests)
 10. [API Overview](#10-api-overview)
 11. [Database](#11-database)
+12. [Limitations](#12-limitations)
 
 # 1. Description
 
@@ -415,3 +416,70 @@ REQUESTED → APPROVED → PICKED_UP → RETURNED
          ↘ DENIED (terminal)
 REQUESTED or APPROVED → CANCELLED (terminal)
 ```
+
+## 12. Limitations
+
+Known constraints and out-of-scope gaps as of 2026-08-12, verified against
+current code. For the live list of confirmed bugs and test-coverage gaps
+(with file/line references), see [`QA_SUMMARY.md`](QA_SUMMARY.md).
+
+- **No SSL/TLS.** Local development runs over HTTP.
+- **No automated migrations.** Tables are created with
+  `CREATE TABLE IF NOT EXISTS` via SQLAlchemy `create_all()`. Schema
+  changes to existing columns require a manual drop and recreate — there's
+  no Alembic (or equivalent) migration chain.
+- **Photo storage is the local filesystem.** Tool photos are written to
+  `backend/media/tool_photos`, not object storage. Fine for local dev and
+  the demo; would need to move to something like S3 before a real
+  multi-instance deployment.
+- **Auth-endpoint rate limits are tight by default, not generous.** Login,
+  forgot-password, and resend-verification default to 10/minute per IP;
+  registration defaults to 10/hour per IP. These are already
+  production-sized to resist credential stuffing and email-bombing, not
+  dev-friendly defaults — raise them via `RATE_LIMIT_*` env vars in
+  dev/e2e environments if a test suite needs more requests from one IP.
+- **Scheduler runs in-process.** Background jobs (auto-cancel, overdue
+  escalation, etc.) run inside the same Uvicorn process, not a separate
+  worker. Set `DISABLE_SCHEDULER=true` to disable.
+- **SMTP is optional for dev.** Email failures are logged but don't block
+  startup; local dev points at MailHog by default. Seed data ships with
+  pre-verified accounts so registration email isn't required to log in.
+- **No real-time messaging.** Messages don't appear on the receiver's
+  screen live — the thread has to be reloaded/refetched to see new
+  messages.
+- **Deleted member profile links break.** After a member is soft-deleted,
+  their public profile route (`GET /users/{id}`) 404s, so historical
+  reservation/review records that reference them (e.g. old reservation
+  history, US7) show a broken profile link instead of a name.
+- **Tool listings have no lending-rules fields yet (US8, US9, US12,
+  US20).** `latest_return_time`, lending rules, and notes-for-borrowers
+  are not implemented anywhere on `Tool` — not on listing creation/edit,
+  not in browse/search, and not factored into return-timing checks.
+- **Auto-cancel notification for owners contacting admins isn't
+  implemented (US16).** A listing owner has no in-app path to contact an
+  admin directly.
+- **Cancellation-reason validation has no visible error message (US15).**
+  The Cancel Request / Cancel Reservation buttons are correctly disabled
+  until a reason is entered, but no message like "Please enter a
+  cancellation reason" is shown, so the requirement isn't obvious from
+  the UI alone.
+- **Report-reason validation has no visible error message (US26).** The
+  listing-report reason field is marked required (and submission is
+  blocked without it), but the "A report reason is required" message
+  doesn't render — only the `*` next to the label hints that it's
+  mandatory.
+- **Review reminder is only half-built (US24, Scenario 9).** The listing
+  owner gets an immediate review notification when a tool is returned;
+  there's no 3-day timer and the borrower never receives a review prompt
+  at all.
+- **Moderation report export is CSV-only (US33).** No PDF or other export
+  format is available.
+- **Admin reservation filtering has no owner/borrower name search
+  (US34).** The admin all-reservations view filters by state, a single
+  `member_id`, and date range — there's no way to filter by owner or
+  borrower name directly.
+- **No Hawaii Standard Time normalization on the request path (US19).**
+  ADR-006 names HST as canonical, and scheduler-side jobs do convert
+  through HST (`app/core/timezone.py`), but request/response endpoints
+  that compare against "today" (e.g. creating a reservation) use naive
+  server-local dates instead.
