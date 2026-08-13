@@ -174,14 +174,17 @@ export async function createPickedUpTool(
   }
   const tool = (await toolResponse.json()) as CreatedTool;
 
-  // The backend compares reservation dates against "today" in HST
-  // (UTC-10), but `Date.toISOString()` is UTC -- for roughly 10 hours a day
-  // (evening HST, already tomorrow in UTC) that mismatch sends a start_date
-  // one day ahead of the backend's HST "today", and mark-picked-up then
-  // rejects it as being before the start date. Shift by the HST offset
-  // before slicing so the calendar date always matches the backend's.
-  const HST_OFFSET_MS = 10 * 60 * 60 * 1000;
-  const fmt = (d: Date) => new Date(d.getTime() - HST_OFFSET_MS).toISOString().slice(0, 10);
+  // ReservationService.create_reservation compares start_date against
+  // `date.today()` -- server-local (UTC in CI), not HST, despite ADR-006
+  // naming HST as canonical (tracked as a SERIOUS gap in
+  // QA_ACCEPTANCE_TESTING_SUMMARY.md: "No HST handling anywhere in the
+  // app"). A prior version of this helper shifted by -10h to compensate
+  // for HST, but that shift itself pushed start_date a day *behind* the
+  // backend's actual UTC "today" for part of the day, causing "Cannot
+  // request a reservation starting in the past". Match the backend's
+  // real (non-HST) behavior instead of the documented-but-unimplemented
+  // one.
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
   const start = new Date();
   const end = new Date();
   end.setDate(end.getDate() + 5);
