@@ -339,8 +339,6 @@ notification vs. cosmetic).
 - **No distinct "profile completed" redirect flag** — one `PUT /auth/me`
   endpoint serves both initial setup and later edits, so there's no
   server-side signal to redirect away from profile setup (US5).
-- **No review-reminder job** three days after a completed reservation —
-  the scheduler runs exactly three unrelated jobs (US24).
 - **"Mark as picked up" control visibility is a frontend rendering
   concern, not a backend gap** — the equivalent backend enforcement
   (rejecting the state transition outright) is covered separately and
@@ -368,6 +366,18 @@ job. Confirmed against current code, not carried over from the old doc:
   violation tracking (US29), moderation report generation (US33), and
   the admin all-reservations overview (US34) — all had 0 passing tests
   in the 2026-07-05/09 version of this doc; all now pass in full.
+
+---
+
+## Documented scope limitations
+
+- **No 3-day post-return review reminder for the borrower (US24,
+  Scenario 9).** Previously tracked as a MINOR gap ("no review-reminder
+  job"); confirmed with the backend lead as intentional, not missing —
+  the owner receives a review notification immediately when the listing
+  is returned, there is no 3-day timer anywhere in the flow, and the
+  borrower never receives a review prompt at all. Closed as a
+  documented scope limitation rather than a bug.
 
 ---
 
