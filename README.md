@@ -17,10 +17,9 @@ Neighborhood Tool Sharing
 5. [Project Structure](#5-project-structure)
 6. [Getting Started](#6-getting-started)
 7. [Environment Variables](#7-environment-variables)
-8. [Running the Application](#8-running-the-application)
-9. [Running Tests](#9-running-tests)
-10. [API Overview](#10-api-overview)
-11. [Database](#11-database)
+8. [Running Tests](#9-running-tests)
+9. [API Overview](#10-api-overview)
+10. [Database](#11-database)
 
 # 1. Description
 
@@ -86,7 +85,7 @@ The application handles authentication (JWT), background scheduling (APScheduler
 
 # 4. Technologies
 
-| Layer | Technology | Notes |
+| Layer | Technology | Version/Notes |
 |-------|------------|-------|
 | **Frontend** | React | 19.x |
 | | React DOM | 19.x |
@@ -99,30 +98,37 @@ The application handles authentication (JWT), background scheduling (APScheduler
 | **Backend** (Service/API) | Python | 3.11, 3.12, or 3.13 |
 | | FastAPI | ≥0.115, <0.120 |
 | | SQLAlchemy | ≥2.0, <2.1 (2.x async style) |
+| | Node.js | 20.19+ or 22.12+ |
+| | npm | 10+ |
 | | asyncpg | Async PostgreSQL driver |
+| | psycopg2-binary | ≥2.9, <3.0 |
 | | Pydantic (Data validation) | ≥2.10, <3.0 |
 | | pydantic-settings | ≥2.7, <3.0 |
 | | Uvicorn | ASGI server (via `python run.py`) |
 | | python-jose[cryptography] | JWT auth (HS256) |
+| | python-dotenv | ≥1.0, <2.0 |
 | | bcrypt | Password hashing (12 rounds) |
 | | JWT (JSON Web Tokens for user authentication) |
 | | APScheduler | ≥3.10, <4.0 (background tasks) |
-| | python-multipart | Photo uploads |
-| | email-validator | Email format validation |
+| | python-multipart | ≥0.0.20, <1.0 (Photo uploads) |
+| | email-validator | ≥2.2, <3.0 (Email format validation) |
 | **Database** | PostgreSQL 15 |
-|  | Docker Container (for PostgreSQL) |
+|  | Docker Container (for PostgreSQL) | 24+ |
+|  | Docker Compose | v2+ |
 | **Environment / Secrets** | `.env` file (for DB passwords, API keys) | python-dotenv (loads `.env` into the app) |
 | **Testing** | pytest | `backend/src/app/tests/` (385 tests: 274 acceptance + 111 auxiliary, ~92% line coverage) |
 | | pytest-asyncio | Async test support |
 | | pytest-cov | Coverage reporting (term/xml/html) |
 | | httpx | ASGI test client |
 | | Playwright | `frontend/e2e/` (121 browser E2E tests across 25 spec files) |
-| **Code Quality** | ruff | Linting and import sorting |
-| | mypy | Static type checking |
-| | bandit | Backend SAST |
+| | factory-boy | ≥3.3, <4.0 |
+| **Code Quality** | ruff | ≥0.8, <1.0 (Linting and import sorting) |
+| | mypy | ≥1.13, <3.0 (Static type checking) |
+| | bandit | ≥1.9, <2.0 (Backend SAST) |
 | | semgrep | Frontend SAST (React/TS/OWASP Top 10 rulesets) |
 | | detect-secrets | Pre-commit secret scanning |
 | **Version Control** | GitHub (branching, pull requests, code review) |
+| | Git | 2.30+ |
 | **IDE** | VS Code or PyCharm |
 
 
@@ -134,7 +140,6 @@ The application handles authentication (JWT), background scheduling (APScheduler
 │   ├── db/init/                  # SQL init for new databases
 │   ├── docker-compose.yml        # PostgreSQL only — app runs on host
 │   ├── Dockerfile                # Production build
-│   ├── media/tool_photos/        # Uploaded photos (runtime, gitignored)
 │   ├── pyproject.toml            # ruff, mypy, pytest config
 │   ├── requirements.txt
 │   ├── run.py                    # Cross-platform server launcher
@@ -152,32 +157,48 @@ The application handles authentication (JWT), background scheduling (APScheduler
 │   │       ├── models/           # SQLAlchemy ORM models
 │   │       ├── schemas/          # Pydantic request/response schemas
 │   │       ├── services/         # Business logic layer
-│   │       └── tests/            # Test suite
+│   │       ├── tests/            # Test suite
+│   │       ├── config.py   
+│   │       ├── dependencies.py
+│   │       ├── dependencies_rate_limit.py
+│   │       └── main.py           
 │   ├── .env                      # Local environment config (gitignored)
 │   └── .env.example              # Safe template — copy to .env
 ├── frontend/
+│   ├── e2e/                      
 │   ├── public/                   # Static assets served directly
 │   ├── src/
+│   │   ├── api/                  # Profile photo upload
 │   │   ├── assets/               # Images, fonts, and other static files
 │   │   ├── components/           # Reusable UI components
+│   │   ├── context/              # Transient logout fix
+│   │   ├── hooks/                # Shared pagination controls
 │   │   ├── types/                # TypeScript type definitions
 │   │   ├── pages/                # Page-level components
 │   │   ├── routes/               # Route definitions (AppRoutes.tsx)
+│   │   ├── utils/                # HST date/time formatting
 │   │   ├── App.css               # Global app styles
 │   │   ├── App.tsx               # Root application component
 │   │   ├── index.css             # Base/reset styles
 │   │   └── main.tsx              # Application entry point
 │   ├── .gitignore
+│   ├── .env.example              # Safe template — copy to .env
 │   ├── eslint.config.js          # ESLint configuration
 │   ├── index.html                # HTML entry point
 │   ├── package-lock.json
 │   ├── package.json
+│   ├── playwright.config.ts      #e2e
 │   ├── tsconfig.app.json         # TypeScript config for app code
 │   ├── tsconfig.json             # TypeScript root config
 │   ├── tsconfig.node.json        # TypeScript config for Node/Vite tooling
+│   ├── tsconfig.playwright.json  #e2e
 │   └── vite.config.ts            # Vite configuration
-├── docs/
-│   └── images/                   # Architecture and domain model diagrams
+├── .gitignore
+├── .pre-commit-config.yaml
+├── Deployment_Guide.md
+├── FINAL_FIXES.md
+├── QA_ACCEPTANCE_TESTING_SUMMARY.md
+├── SETUP_AND_TEST_GUIDE.md
 └── README.md
 ```
 
@@ -197,57 +218,61 @@ The application handles authentication (JWT), background scheduling (APScheduler
 
 > **Windows users:** See `backend/Backend_Setup.md` for PowerShell vs Git Bash vs cmd.exe notes and a tip on adding Python to PATH during install.
 
-### Setup
+### Setup (Local)
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/ICS613-Group3/Group3-ICS613-project
+git clone https://github.com/ICS613-Group3/Group3-ICS613-project.git
 cd Group3-ICS613-project
 
-# 2. Move into the backend folder
+# 2. Start PostgreSQL (Docker)
 cd backend
-
-# 3. Start the database container (PostgreSQL only)
 docker compose up -d
-# Verify it is healthy before continuing:
+# Verify it is healthy before continuing. tool-db shows (healthy)
 docker compose ps
+# Verify database connectivity; Should return: 1
+docker exec tool-db psql -U ics613user -d toolsharing -c "SELECT 1;"
 
-# 4. Create and activate a Python virtual environment
+# 3. Setup Backend
 python -m venv venv
-source venv/bin/activate               # PowerShell: .\venv\Scripts\Activate.ps1
+source venv/bin/activate               # Windows: .\venv\Scripts\activate
 
-# 5. Install dependencies
+pip install --upgrade pip
 pip install -r requirements.txt
 
-# 6. Configure environment variables
-cp .env.example .env
-# The defaults work for local development — no edits needed to run locally.
-# See Section 7 for what each variable does.
+cp .env.example .env       #cmd use copy
+#.env.example already includes ENVIRONMENT=development and default connection settings (local)
+# See Section 7 below for what each variable does.
 
-# 7. Verify database connectivity
-python scripts/check_db.py
-# All 6 checks should report [OK]
-
-# 8. Create database tables
+# 4. Initialize Database
 python scripts/init_db.py
+# Expected: All tables created successfully.
 
-# 9. (Optional) Load seed data — development only
+# 5. (Optional) Load seed data — development only
 python scripts/seed_dev.py
-# Creates 3 demo users and 12 tool listings. Passwords are printed to the terminal.
+# Creates 3 demo users and 12 tool listings. Passwords are printed to the terminal and also noted in section 7. Seed Data of Deployment_Guide.md
 
-# 10. Start the backend server
-python run.py --reload
+# 6. Start the backend server
+python run.py --port 8000
 ```
 
 ```bash
-# 11. Set up the frontend (open in a new terminal from repo root)
+# 7. Set up the frontend (open in a new terminal from repo root)
 cd frontend
 npm install
 npm run dev
+# Vite starts on http://localhost:5173
 ```
 
-For full detail on each step — including Windows-specific commands, troubleshooting, and seed user credentials — see [`backend/Backend_Setup.md`](backend/Backend_Setup.md).
+For full detail on local deployment — including Windows-specific commands, troubleshooting, and seed user credentials — see [`Deployment_Guide.md`](Deployment_Guide.md).
 
+# Docker containers (database only)
+
+| Container | Image | Purpose | Port |
+|-----------|-------|---------|------|
+| `tool-db` | postgres:15 | Database | 5432 → 5432 |
+
+> The FastAPI app runs **on the host** via `python run.py`, not inside Docker. If `docker ps` shows a `tool-share-backend-1` container, your `docker-compose.yml` is out of date — pull the latest changes and run `docker compose up -d --remove-orphans`.
 
 # Local security tooling setup
 
@@ -284,37 +309,7 @@ incident (rotate/remove the credential) instead of baselining it away.
 > **Production `SECRET_KEY`:** Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"` and paste into `.env`. The app will refuse to start in production with the placeholder value.
 
 
-
-## 8. Running the Application
-
-### Backend
-```bash
-cd backend
-source venv/bin/activate             # PowerShell: .\venv\Scripts\Activate.ps1
-python run.py --reload
-```
-- API: `http://localhost:8000`
-- Interactive API docs (Swagger UI): `http://localhost:8000/docs`
-
-### Frontend
-```bash
-cd frontend
-npm install        # first time only
-npm run dev
-```
-- App: `http://localhost:5173`
-
-### Docker containers (database only)
-
-| Container | Image | Purpose | Port |
-|-----------|-------|---------|------|
-| `tool-db` | postgres:15 | Database | 5432 → 5432 |
-
-> The FastAPI app runs **on the host** via `python run.py`, not inside Docker. If `docker ps` shows a `tool-share-backend-1` container, your `docker-compose.yml` is out of date — pull the latest changes and run `docker compose up -d --remove-orphans`.
-
-
-
-## 9. Running Tests
+## 8. Running Tests
 
 ### Backend (pytest)
 
@@ -373,7 +368,7 @@ Every push and PR to `main` runs, via [`.github/workflows/ci.yml`](.github/workf
 
 
 
-## 10. API Overview
+## 9. API Overview
 
 All endpoints are prefixed with `/api/v1`. Authentication uses a **JWT Bearer token** in the `Authorization` header.
 
@@ -393,7 +388,7 @@ Full interactive documentation is available at `http://localhost:8000/docs` when
 
 
 
-## 11. Database
+## 10. Database
 
 **PostgreSQL 15** running in Docker. Schema is managed with `init_db.py` (SQLAlchemy `create_all()`).
 
