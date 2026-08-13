@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_to_hst
 from app.models.enums import ReservationState
 from app.services.scheduler import SchedulerService
 from app.tests.acceptance.helpers import (
@@ -262,11 +263,17 @@ class TestScenario7ToolNeverReturnedEscalationAfterSevenDays:
     async def test_admin_notified_and_borrower_profile_flagged(
         self, client, db_session: AsyncSession
     ) -> None:
+        # Cutoffs are computed by the scheduler against HST (ADR-006), not
+        # server-local `date.today()` -- those two dates disagree for part
+        # of the UTC day (any run between 00:00-10:00 UTC). end_date must be
+        # built from the same HST "today" the scheduler uses, or this test
+        # flakes depending on what time of day CI happens to run it.
+        hst_today = utc_to_hst(datetime.now(UTC)).date()
         owner, borrower, tool, reservation = await _make_picked_up_reservation(
             client,
             db_session,
-            start_date=date.today() - timedelta(days=20),
-            end_date=date.today() - timedelta(days=8),
+            start_date=hst_today - timedelta(days=20),
+            end_date=hst_today - timedelta(days=8),
         )
         admin = await UserFactory.create_async(db_session, is_admin=True)
 
