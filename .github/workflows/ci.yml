@@ -276,9 +276,19 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # cdn.playwright.dev occasionally 403s hosted runners with an
+      # "Access denied ... not available in your location" geo-block that
+      # clears on retry (different runner, different edge PoP) -- not a
+      # real dependency problem, so retry a few times before failing.
       - name: Install Playwright browsers
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "Playwright browser install failed (attempt $i/3), retrying..."
+            sleep 10
+          done
+          exit 1
 
       - name: Run Playwright E2E tests
         working-directory: frontend
@@ -326,8 +336,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # See the frontend-e2e job's identical step for why this retries.
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "Playwright browser install failed (attempt $i/3), retrying..."
+            sleep 10
+          done
+          exit 1
 
       - name: Run TC-102 pickup visibility test
         run: npm run test:e2e:issue141
